@@ -1,0 +1,8 @@
+# CORE Module Configuration
+# Project: Integration
+# Version: 6.0.0-alpha.23
+
+user_name: Jacques
+communication_language: french
+document_output_language: french
+output_folder: "{project-root}/docs"

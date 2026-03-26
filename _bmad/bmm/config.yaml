@@ -1,0 +1,17 @@
+# BMM Module Configuration
+# Project: Integration
+# Version: 6.0.0-alpha.23
+
+project_name: integration
+user_skill_level: intermediate
+planning_artifacts: "{project-root}/docs/planning-artifacts"
+implementation_artifacts: "{project-root}/docs/implementation-artifacts"
+project_knowledge: "{project-root}/docs"
+tea_use_mcp_enhancements: false
+tea_use_playwright_utils: false
+
+# Core Configuration Values
+user_name: Jacques
+communication_language: french
+document_output_language: french
+output_folder: "{project-root}/docs"
