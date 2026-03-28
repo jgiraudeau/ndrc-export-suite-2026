@@ -1,0 +1,105 @@
+[
+    {
+        "code": "E4.CIBLER",
+        "description": "Cibler et prospecter la clientèle",
+        "block": "E4",
+        "children": [
+            {
+                "description": "Analyser un portefeuille clients",
+                "criteria": [
+                    "Pertinence de l’analyse du portefeuille clients",
+                    "Qualification pertinente des prospects"
+                ]
+            },
+            {
+                "description": "Identifier des cibles de clientèle",
+                "criteria": [
+                    "Cohérence entre le ciblage et la démarche de prospection"
+                ]
+            },
+            {
+                "description": "Mettre en oeuvre et évaluer une démarche de prospection",
+                "criteria": [
+                    "Efficacité des choix opérés"
+                ]
+            },
+            {
+                "description": "Développer des réseaux professionnels",
+                "criteria": [
+                    "Activation pertinente des réseaux professionnels"
+                ]
+            }
+        ]
+    },
+    {
+        "code": "E4.NEGOCIER",
+        "description": "Négocier et accompagner la relation client",
+        "block": "E4",
+        "children": [
+            {
+                "description": "Négocier et vendre une solution adaptée au client",
+                "criteria": [
+                    "Maîtrise de la relation interpersonnelle",
+                    "Efficacité de la négociation commerciale",
+                    "Pertinence de la solution proposée"
+                ]
+            },
+            {
+                "description": "Créer et maintenir une relation client durable",
+                "criteria": [
+                    "Personnalisation de la relation client",
+                    "Qualité du diagnostic et de l’accompagnement client",
+                    "Respect des engagements",
+                    "Évolutivité et enrichissement de la relation client"
+                ]
+            }
+        ]
+    },
+    {
+        "code": "E4.EVENT",
+        "description": "Organiser et animer un évènement commercial",
+        "block": "E4",
+        "children": [
+            {
+                "description": "Organiser un évènement commercial",
+                "criteria": [
+                    "Pertinence du choix de l’évènement commercial",
+                    "Efficacité de l’organisation au regard des contraintes logistiques, financières, commerciales"
+                ]
+            },
+            {
+                "description": "Animer un évènement commercial",
+                "criteria": [
+                    "Qualité et efficacité de l’animation"
+                ]
+            },
+            {
+                "description": "Exploiter un évènement commercial",
+                "criteria": [
+                    "Précision du bilan quantitatif et qualitatif de l’évènement commercial",
+                    "Rigueur dans le suivi des contacts et des opportunités d’affaires"
+                ]
+            }
+        ]
+    },
+    {
+        "code": "E4.INFO",
+        "description": "Exploiter et mutualiser l'information commerciale",
+        "block": "E4",
+        "children": [
+            {
+                "description": "Remonter, valoriser et partager l’information commerciale",
+                "criteria": [
+                    "Pertinence et qualité des informations collectées",
+                    "Sélection et hiérarchisation de l’information diffusée"
+                ]
+            },
+            {
+                "description": "Collaborer à l’interne en vue de développer l’expertise commerciale",
+                "criteria": [
+                    "Qualité des analyses commerciales et des propositions"
+                ]
+            }
+        ]
+    }
+]

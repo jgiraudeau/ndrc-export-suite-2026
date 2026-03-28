@@ -1,0 +1,98 @@
+[
+    {
+        "code": "E6.D",
+        "description": "Implanter et promouvoir l'offre (Distribution)",
+        "block": "E6",
+        "children": [
+            {
+                "description": "Valoriser l’offre sur le lieu de vente",
+                "criteria": [
+                    "Suivre l'application des accords",
+                    "Analyser la cohérence merchandising",
+                    "Argumenter des préconisations"
+                ]
+            },
+            {
+                "description": "Développer la présence réseau",
+                "criteria": [
+                    "Diagnostiquer rayon/zone",
+                    "Identifier opportunités référencement",
+                    "Maîtriser techniques implantation"
+                ]
+            },
+            {
+                "description": "Proposer une animation commerciale",
+                "criteria": [
+                    "Choisir/justifier animation",
+                    "Créer les outils (PLV, ILV)",
+                    "Planifier l'action"
+                ]
+            },
+            {
+                "description": "Évaluer l’efficacité de l’animation",
+                "criteria": [
+                    "Présenter un reporting (CA, Marge)",
+                    "Formuler un bilan argumenté",
+                    "Proposer des remédiations"
+                ]
+            }
+        ]
+    },
+    {
+        "code": "E6.P",
+        "description": "Développer un réseau de partenaires",
+        "block": "E6",
+        "children": [
+            {
+                "description": "Participer au développement du réseau",
+                "criteria": [
+                    "Analyse macro/micro environnement",
+                    "Matrice SWOT",
+                    "Identifier besoins",
+                    "Dégager problématique"
+                ]
+            },
+            {
+                "description": "Mobiliser et évaluer le réseau",
+                "criteria": [
+                    "Listing partenaires",
+                    "Tableau multicritères",
+                    "Actions d'animation",
+                    "Outils d'évaluation perf."
+                ]
+            }
+        ]
+    },
+    {
+        "code": "E6.VD",
+        "description": "Créer et animer un réseau (Vente Directe)",
+        "block": "E6",
+        "children": [
+            {
+                "description": "Prospecter et vendre en réunion",
+                "criteria": [
+                    "Fichier prospects",
+                    "Com. digitale",
+                    "Méthodes vente réunion",
+                    "Utilisation OAV"
+                ]
+            },
+            {
+                "description": "Recruter et former des vendeurs",
+                "criteria": [
+                    "Processus recrutement",
+                    "Statuts VDI",
+                    "Cadre légal et éthique"
+                ]
+            },
+            {
+                "description": "Impulser une dynamique de réseau",
+                "criteria": [
+                    "Outils stimulation",
+                    "Rémunération",
+                    "Stratégie développement"
+                ]
+            }
+        ]
+    }
+]
