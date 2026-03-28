@@ -44,7 +44,7 @@ export async function PATCH(request: NextRequest) {
             return apiError("teacherId et action requis");
         }
 
-        if (!["approve", "reject", "delete"].includes(action)) {
+        if (!["approve", "reject", "delete", "reset_password"].includes(action)) {
             return apiError("Action invalide (approve, reject, delete)");
         }
 
@@ -59,6 +59,22 @@ export async function PATCH(request: NextRequest) {
         if (action === "delete") {
             await prisma.teacher.delete({ where: { id: teacherId } });
             return apiSuccess({ message: "Formateur supprimé" });
+        }
+
+        if (action === "reset_password") {
+            const tempPassword = Math.random().toString(36).slice(-8) + "!";
+            const bcrypt = await import("bcryptjs");
+            const passwordHash = await bcrypt.hash(tempPassword, 10);
+            
+            await prisma.teacher.update({
+                where: { id: teacherId },
+                data: { passwordHash }
+            });
+
+            return apiSuccess({ 
+                message: "Mot de passe réinitialisé", 
+                tempPassword 
+            });
         }
 
         const newStatus = action === "approve" ? "active" : "rejected";

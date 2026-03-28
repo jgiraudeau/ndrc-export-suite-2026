@@ -290,12 +290,25 @@ export interface TeacherAdmin {
     _count: { students: number; classes: number };
 }
 
+export interface AdminStats {
+    teachers: number;
+    pendingTeachers: number;
+    students: number;
+    classes: number;
+    experiences: number;
+    entries: number;
+}
+
+export async function apiGetAdminStats() {
+    return apiFetch<AdminStats>("/api/admin/stats");
+}
+
 export async function apiGetTeachers() {
     return apiFetch<TeacherAdmin[]>("/api/admin/teachers");
 }
 
-export async function apiManageTeacher(teacherId: string, action: "approve" | "reject" | "delete") {
-    return apiFetch<{ message: string }>(
+export async function apiManageTeacher(teacherId: string, action: "approve" | "reject" | "delete" | "reset_password") {
+    return apiFetch<{ message: string; tempPassword?: string }>(
         "/api/admin/teachers",
         { method: "PATCH", body: JSON.stringify({ teacherId, action }) }
     );

@@ -15,12 +15,17 @@ export async function POST(request: NextRequest) {
         const adminEmail = process.env.ADMIN_EMAIL;
         const adminPassword = process.env.ADMIN_PASSWORD;
 
-        if (!adminEmail || !adminPassword) {
-            return apiError("Configuration admin manquante", 500);
+        if (!adminEmail) {
+            console.error("ERREUR CRITIQUE : ADMIN_EMAIL est indéfinie dans Vercel");
+            return apiError("Configuration ADMIN_EMAIL manquante", 500);
+        }
+        if (!adminPassword) {
+            console.error("ERREUR CRITIQUE : ADMIN_PASSWORD est indéfinie dans Vercel");
+            return apiError("Configuration ADMIN_PASSWORD manquante", 500);
         }
 
-        if (email.toLowerCase().trim() !== adminEmail.toLowerCase()) {
-            return apiError("Identifiants incorrects", 401);
+        if (email.toLowerCase().trim() !== adminEmail.toLowerCase().trim()) {
+            return apiError("Identifiants incorrects (Email ne correspond pas)", 401);
         }
 
         if (password !== adminPassword) {
