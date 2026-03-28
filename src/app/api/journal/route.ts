@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
             orderBy: { date: "desc" },
             include: {
                 experience: { select: { title: true } },
-                assignment: { select: { title: true } }
+                assignment: { select: { mission: { select: { title: true } } } }
             }
         });
 

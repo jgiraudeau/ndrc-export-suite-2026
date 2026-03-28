@@ -73,7 +73,7 @@ export const DOCXService = {
                                 new TableRow({
                                     children: [
                                         new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "COMPÉTENCES", bold: true })] })] }),
-                                        new TableCell({ children: [new Paragraph(exp.competencyIds.map(id => `• ${getCompetencyLabel(id)}`).join("\n"))] }),
+                                        new TableCell({ children: [new Paragraph(exp.competencyIds.map((id: string) => `• ${getCompetencyLabel(id)}`).join("\n"))] }),
                                     ],
                                 }),
                             ],
@@ -103,7 +103,7 @@ export const DOCXService = {
                                     new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "STATUT", bold: true })] })] }),
                                 ]
                             }),
-                            ...logs.map(l => new TableRow({
+                            ...logs.map((l: any) => new TableRow({
                                 children: [
                                     new TableCell({ children: [new Paragraph(new Date(l.date).toLocaleDateString("fr-FR"))] }),
                                     new TableCell({ children: [new Paragraph(l.content)] }),
@@ -139,7 +139,7 @@ export const DOCXService = {
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 400 },
                     }),
-                    ...content.split("\n").map(line => {
+                    ...content.split("\n").map((line: string) => {
                         const trimmed = line.trim();
                         if (trimmed.startsWith("#")) {
                             return new Paragraph({
