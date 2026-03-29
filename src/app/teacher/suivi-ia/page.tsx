@@ -222,7 +222,7 @@ export default function SuiviIAPage() {
                          <Sparkles size={16} />
                       </div>
                       <p className="text-indigo-800 text-xs font-bold leading-relaxed">
-                         L'IA aide 80% des élèves à débloquer leurs problèmes techniques WordPress en autonomie.
+                         L'IA aide 80% des étudiants à débloquer leurs problèmes techniques WordPress en autonomie.
                       </p>
                    </div>
                 </div>

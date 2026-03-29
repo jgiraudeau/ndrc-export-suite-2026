@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Target, Briefcase, Loader2, Sparkles, Download, FileText, BookmarkCheck, Clock, CheckCircle2, Play } from "lucide-react";
 import Link from "next/link";
-import { apiGetProgress, apiGetMyMissions, apiUpdateMissionStatus, apiSaveMission, type MissionAssignmentData } from "@/lib/api-client";
+import { apiGetProgress, apiGetMyMissions, apiUpdateMissionStatus, apiSaveMission, apiFetch, type MissionAssignmentData } from "@/lib/api-client";
 import { ALL_COMPETENCIES } from "@/data/competencies";
 import { cn } from "@/lib/utils";
 import { jsPDF } from "jspdf";
+import { calculateBadge } from "@/lib/exports/badges";
+import { PDFExportService } from "@/lib/exports/student-export";
 
 type Tab = "assigned" | "generate";
 
@@ -27,6 +29,8 @@ export default function MissionsPage() {
     const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3 | 4>(2);
     const [selectedCategory, setSelectedCategory] = useState<string>("Toutes");
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [progress, setProgress] = useState<any>(null);
+    const [studentData, setStudentData] = useState<any>(null);
 
     const [missionMarkdown, setMissionMarkdown] = useState<{ text: string, ids: string[] } | null>(null);
     const [errorMsg, setErrorMsg] = useState("");
@@ -39,9 +43,11 @@ export default function MissionsPage() {
         Promise.all([
             apiGetProgress(),
             apiGetMyMissions(),
-        ]).then(([progressRes, missionsRes]) => {
-            if (progressRes.error) { console.error("Erreur serveur", progressRes.error); }
+            apiFetch<any>("/api/student/profile")
+        ]).then(([progressRes, missionsRes, profileRes]) => {
+            if (progressRes.data) setProgress(progressRes.data);
             if (missionsRes.data) setAssignedMissions(missionsRes.data);
+            if (profileRes.data) setStudentData(profileRes.data.student);
             setIsLoading(false);
         });
     }, [router]);
@@ -139,6 +145,45 @@ export default function MissionsPage() {
                         <Sparkles size={14} /> Générer
                     </button>
                 </div>
+
+                {tab === "assigned" && (
+                    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Certification E5B</h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Dossier de Missions & Preuves</p>
+                            </div>
+                            {progress && (
+                                <div className={cn(
+                                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border",
+                                    calculateBadge(progress.filter((p: any) => p.teacherStatus != null).length, progress.length).color
+                                )}>
+                                    {calculateBadge(progress.filter((p: any) => p.teacherStatus != null).length, progress.length).label}
+                                </div>
+                            )}
+                        </div>
+                        <button 
+                            onClick={() => {
+                                if (!studentData || !progress) return;
+                                const badge = calculateBadge(progress.filter((p: any) => p.teacherStatus != null).length, progress.length);
+                                PDFExportService.generateBadgeExport({
+                                    title: "Épreuve E5B - Dossier de Missions",
+                                    studentName: `${studentData.firstName} ${studentData.lastName}`,
+                                    badge: badge,
+                                    items: assignedMissions.map(m => ({
+                                        title: m.title,
+                                        description: `Niveau ${m.level} - ${m.platform}`,
+                                        status: m.status === "completed" ? "Validé" : "En cours"
+                                    }))
+                                });
+                            }}
+                            className="bg-slate-900 text-white rounded-2xl py-3.5 font-black text-xs shadow-xl shadow-slate-200 hover:bg-black transition-all flex items-center justify-center gap-2"
+                        >
+                            <Download size={16} className="text-amber-400" />
+                            Générer mon Dossier Officiel PDF
+                        </button>
+                    </div>
+                )}
 
                 {tab === "assigned" ? (
                     /* Onglet Mes Missions */

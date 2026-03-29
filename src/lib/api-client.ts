@@ -11,7 +11,7 @@ function getToken(): string | null {
     return localStorage.getItem("ndrc_token");
 }
 
-async function apiFetch<T>(
+export async function apiFetch<T>(
     path: string,
     options: RequestInit = {}
 ): Promise<{ data: T | null; error: string | null }> {
@@ -438,4 +438,14 @@ export async function apiGetJournal(params: { experienceId?: string; assignmentI
     if (params.assignmentId) query.append("assignmentId", params.assignmentId);
     if (params.studentId) query.append("studentId", params.studentId);
     return apiFetch<JournalEntry[]>(`/api/journal?${query.toString()}`);
+}
+
+/**
+ * Valide numériquement une évaluation (E4/E6)
+ */
+export async function apiValidateEvaluation(studentId: string, type: string, isValidated: boolean = true) {
+    return apiFetch<{ success: boolean }>("/api/teacher/evaluations/validate", {
+        method: "POST",
+        body: JSON.stringify({ studentId, type, isValidated }),
+    });
 }

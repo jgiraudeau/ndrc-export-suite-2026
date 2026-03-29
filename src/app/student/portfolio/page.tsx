@@ -15,8 +15,9 @@ import {
 import { apiGetExperiences, apiStudentDashboard, type ProfessionalExperience, type StudentDashboardData } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { ExperienceModal } from "@/components/teacher/ExperienceModal";
-import { PDFService } from "@/lib/pdf-service";
-import { FileDown } from "lucide-react";
+import { PDFExportService } from "@/lib/exports/student-export";
+import { calculateBadge } from "@/lib/exports/badges";
+import { FileDown, ShieldCheck } from "lucide-react";
 
 export default function StudentPortfolioPage() {
   const [experiences, setExperiences] = useState<ProfessionalExperience[]>([]);
@@ -40,8 +41,17 @@ export default function StudentPortfolioPage() {
 
   const handleDownloadPDF = () => {
     if (!studentData) return;
-    const validatedExps = experiences.filter(e => e.status === "VALIDATED");
-    PDFService.generateProPassport(studentData, validatedExps);
+    const badge = calculateBadge(studentData.progress.acquiredCount, studentData.progress.totalCount);
+    PDFExportService.generateBadgeExport({
+      title: "Passeport Professionnel NDRC",
+      studentName: `${studentData.firstName} ${studentData.lastName}`,
+      badge: badge,
+      items: experiences.map(e => ({
+        title: e.title,
+        description: `${e.type} - ${new Date(e.startDate).toLocaleDateString()}`,
+        status: e.status === "VALIDATED" ? "Validé" : (e.status === "SUBMITTED" ? "En revue" : "Brouillon")
+      }))
+    });
   };
 
   useEffect(() => {
@@ -94,6 +104,42 @@ export default function StudentPortfolioPage() {
           </button>
         </div>
       </div>
+
+      {studentData && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-xl",
+                calculateBadge(studentData.progress.acquiredCount, studentData.progress.totalCount).color.split(" ")[0]
+              )}>
+                <ShieldCheck size={32} />
+              </div>
+              <div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Niveau d'Excellence</div>
+                <div className="text-2xl font-black text-slate-900 tracking-tight">
+                  {calculateBadge(studentData.progress.acquiredCount, studentData.progress.totalCount).label}
+                </div>
+              </div>
+            </div>
+            <div className="hidden sm:block text-right">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Progression</div>
+              <div className="text-lg font-black text-indigo-600">{Math.round((studentData.progress.acquiredCount / studentData.progress.totalCount) * 100)}%</div>
+            </div>
+          </div>
+          
+          <div className="bg-slate-900 p-8 rounded-[32px] text-white flex flex-col justify-center">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Certification</div>
+            <p className="text-xs font-bold leading-relaxed mb-4 text-slate-300">Validez votre passeport pour le présenter à l'examen officiel.</p>
+            <button 
+              onClick={handleDownloadPDF}
+              className="w-full py-3 bg-white text-slate-900 rounded-xl font-black text-xs hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+            >
+              <FileDown size={14} /> Télécharger Dossier
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center p-20 gap-4">

@@ -312,22 +312,22 @@ export default function StudentChatPage() {
                       : "bg-indigo-600 text-white rounded-tr-none shadow-indigo-100"
                   )}>
                     <div className="prose prose-sm prose-slate prose-invert max-w-none">
-                      <ReactMarkdown 
-                        className={cn(
+                      <div className={cn(
                           "text-sm leading-relaxed",
                           msg.role === "user" ? "text-indigo-50" : "text-slate-600 font-medium"
-                        )}
-                      >
-                        {msg.content}
-                      </ReactMarkdown></div>
+                        )}>
+                        <ReactMarkdown>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
                     </div>
                   </div>
                   <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest px-1">
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-              </div>
-            ))}
+              ))}
 
             {loading && (
               <div className="flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300">

@@ -7,11 +7,14 @@ import {
   CheckCircle2, 
   Save, 
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiGradeCompetency } from "@/lib/api-client";
+import { apiGradeCompetency, apiValidateEvaluation } from "@/lib/api-client";
+import { Badge } from "@/components/ui/badge";
+import { ShieldCheck, Calendar } from "lucide-react";
 
 interface Criterion {
   description: string;
@@ -36,13 +39,18 @@ interface ReferentialGridProps {
   type?: "E4" | "E6";
   initialGrades?: Record<string, number>;
   readOnly?: boolean;
+  isValidated?: boolean;
+  validatedAt?: string | null;
 }
 
-export function ReferentialGrid({ studentId, referential, title, type, initialGrades = {}, readOnly = false }: ReferentialGridProps) {
+export function ReferentialGrid({ studentId, referential, title, type, initialGrades = {}, readOnly = false, isValidated: initialIsValidated = false, validatedAt: initialValidatedAt = null }: ReferentialGridProps) {
   const [expandedCodes, setExpandedCodes] = useState<Record<string, boolean>>({});
   const [currentGrades, setCurrentGrades] = useState<Record<string, number>>(initialGrades);
   const [dirtyCodes, setDirtyCodes] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [isValidated, setIsValidated] = useState(initialIsValidated);
+  const [validatedAt, setValidatedAt] = useState<string | null>(initialValidatedAt);
+  const [isValidating, setIsValidating] = useState(false);
 
   const toggleExpand = (code: string) => {
     setExpandedCodes(prev => ({ ...prev, [code]: !prev[code] }));
@@ -93,6 +101,31 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       setSavingId(null);
     }
   };
+
+  const isAllGraded = useMemo(() => {
+    return referential.every(comp => 
+      comp.children.every((_, idx) => !!currentGrades[`${comp.code}_${idx}`])
+    );
+  }, [referential, currentGrades]);
+
+  const handleToggleValidation = async () => {
+    if (!type || isReadOnly) return;
+    setIsValidating(true);
+    try {
+      const nextState = !isValidated;
+      const res = await apiValidateEvaluation(studentId, type, nextState);
+      if (res && !res.error) {
+        setIsValidated(nextState);
+        setValidatedAt(nextState ? new Date().toISOString() : null);
+      }
+    } catch (err) {
+      console.error("Failed to validate evaluation", err);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const isReadOnly = readOnly || isValidated;
 
   return (
     <div className="space-y-6">
@@ -215,6 +248,69 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           </div>
         );
       })}
+
+      {/* ── Certification Zone ───────────────────────────────── */}
+      {!readOnly && type && (
+        <div className={cn(
+            "mt-12 p-10 rounded-[40px] border-2 transition-all duration-500",
+            isValidated 
+                ? "bg-emerald-50 border-emerald-100 shadow-xl shadow-emerald-50" 
+                : "bg-white border-dashed border-slate-200"
+        )}>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex items-center gap-6">
+                    <div className={cn(
+                        "w-20 h-20 rounded-3xl flex items-center justify-center transition-all duration-700",
+                        isValidated ? "bg-emerald-600 text-white shadow-2xl shadow-emerald-200 rotate-12" : "bg-slate-100 text-slate-300"
+                    )}>
+                        <ShieldCheck size={40} />
+                    </div>
+                    <div>
+                        <h3 className={cn(
+                            "text-2xl font-black tracking-tight mb-1",
+                            isValidated ? "text-emerald-900" : "text-slate-800"
+                        )}>
+                            Certification Numériqu{isValidated ? "e effectuée" : "e du dossier"}
+                        </h3>
+                        <p className="text-slate-400 font-bold text-sm max-w-md">
+                            {isValidated 
+                                ? `Ce dossier a été certifié conforme par le formateur ${validatedAt ? 'le ' + new Date(validatedAt).toLocaleDateString() : ''}.`
+                                : "Une fois toutes les compétences évaluées, vous pourrez certifier numériquement ce dossier pour l'export officiel."}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="shrink-0">
+                    <button
+                        onClick={handleToggleValidation}
+                        disabled={isValidating || (!isValidated && !isAllGraded)}
+                        className={cn(
+                            "group relative overflow-hidden px-10 py-5 rounded-[24px] font-black tracking-tight transition-all active:scale-95 disabled:opacity-50 disabled:grayscale",
+                            isValidated 
+                                ? "bg-white text-emerald-600 border-2 border-emerald-100 hover:bg-emerald-50" 
+                                : "bg-slate-900 text-white shadow-2xl shadow-slate-200 hover:scale-105"
+                        )}
+                    >
+                        {isValidating ? (
+                            <Loader2 className="animate-spin mx-auto" size={24} />
+                        ) : isValidated ? (
+                            "Annuler la certification"
+                        ) : (
+                            <span className="flex items-center gap-3">
+                                {isAllGraded ? <Sparkles size={20} className="text-amber-400" /> : <AlertCircle size={20} />}
+                                {isAllGraded ? "Certifier ce dossier" : "Dossier incomplet"}
+                            </span>
+                        )}
+                    </button>
+                    {!isValidated && !isAllGraded && (
+                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest text-center mt-3">
+                            Toutes les notes sont requises
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

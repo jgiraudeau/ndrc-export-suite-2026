@@ -148,6 +148,8 @@ model Evaluation {
   type          String             @default("formative")
   situation     String
   globalComment String?
+  isValidated   Boolean            @default(false)
+  validatedAt   DateTime?
   createdAt     DateTime           @default(now())
   evaluator     Teacher            @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
   session       EvaluationSession? @relation(fields: [sessionId], references: [id])
