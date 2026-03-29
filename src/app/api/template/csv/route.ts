@@ -17,7 +17,7 @@ export async function GET() {
     return new NextResponse(finalBuffer, {
         headers: {
             'Content-Type': 'application/octet-stream', // Force le téléchargement binaire
-            'Content-Disposition': 'attachment; filename="modele_import_eleves.csv"',
+            'Content-Disposition': 'attachment; filename="modele_import_etudiants.csv"',
             'Cache-Control': 'no-store, max-age=0', // Évite le cache navigateur
         },
     });

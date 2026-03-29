@@ -139,7 +139,7 @@ export default function TeacherDashboard() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.setAttribute("download", "modele_import_eleves.csv");
+        link.setAttribute("download", "modele_import_etudiants.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -154,7 +154,7 @@ export default function TeacherDashboard() {
         const text = await file.text();
         const parsed = parseCSV(text);
         if (parsed.length === 0) {
-            setImportStatus({ type: "error", message: "Aucun élève trouvé dans le fichier." });
+            setImportStatus({ type: "error", message: "Aucun étudiant trouvé dans le fichier." });
             return;
         }
         const { data, error } = await apiImportStudents(parsed);
@@ -205,7 +205,7 @@ export default function TeacherDashboard() {
         ));
     };
 
-    // Dérive les classes depuis les élèves
+    // Dérive les classes depuis les étudiants
     const classes = Array.from(new Set(students.map(s => s.classCode))).sort();
 
     const filteredStudents = students
@@ -230,7 +230,7 @@ export default function TeacherDashboard() {
                 {/* Section d'import et stats */}
                 <div className="flex flex-col md:flex-row justify-between items-end gap-4">
                     <div>
-                        <h1 className="text-2xl font-black text-slate-800">Mes Élèves</h1>
+                        <h1 className="text-2xl font-black text-slate-800">Mes Étudiants</h1>
                         <p className="text-slate-500 text-sm">Gérez vos classes et suivez les compétences digitales.</p>
                     </div>
                     <div className="flex gap-2">
@@ -337,14 +337,14 @@ export default function TeacherDashboard() {
                                             <div className="p-5 border-b border-slate-100">
                                                 <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2 mb-3">
                                                     <Globe size={15} className="text-purple-500" />
-                                                    Liens des sites élèves
+                                                    Liens des sites étudiants
                                                 </h4>
                                                 <div className="flex flex-col md:flex-row gap-3">
                                                     <div className="flex-1">
                                                         <label className="block text-xs text-slate-500 font-medium mb-1">WordPress</label>
                                                         <input
                                                             type="text"
-                                                            placeholder="https://wp.eleve.com"
+                                                            placeholder="https://wp.etudiant.com"
                                                             value={wpInputs[student.id] !== undefined ? wpInputs[student.id] : (student.wpUrl || "")}
                                                             onChange={e => setWpInputs(prev => ({ ...prev, [student.id]: e.target.value }))}
                                                             className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-purple-400 bg-white"
@@ -354,7 +354,7 @@ export default function TeacherDashboard() {
                                                         <label className="block text-xs text-slate-500 font-medium mb-1">PrestaShop</label>
                                                         <input
                                                             type="text"
-                                                            placeholder="https://presta.eleve.com"
+                                                            placeholder="https://presta.etudiant.com"
                                                             value={prestaInputs[student.id] !== undefined ? prestaInputs[student.id] : (student.prestaUrl || "")}
                                                             onChange={e => setPrestaInputs(prev => ({ ...prev, [student.id]: e.target.value }))}
                                                             className="w-full text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-purple-400 bg-white"
@@ -409,7 +409,7 @@ export default function TeacherDashboard() {
                     </div>
                 ) : (
                     <div className="text-center py-16 text-slate-400 text-sm">
-                        {students.length === 0 ? "Aucun élève — glissez un fichier CSV pour commencer." : "Aucun résultat."}
+                        {students.length === 0 ? "Aucun étudiant — glissez un fichier CSV pour commencer." : "Aucun résultat."}
                     </div>
                 )}
             </div>

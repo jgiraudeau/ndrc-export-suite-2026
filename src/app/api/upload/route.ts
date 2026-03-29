@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-helpers';
 
 export async function POST(request: NextRequest) {
-    // Vérification de l'utilisateur (Élève autorisé à uploader)
+    // Vérification de l'utilisateur (Étudiant autorisé à uploader)
     const auth = await requireAuth(request, ["STUDENT"]);
     if ("status" in auth) return auth;
 

@@ -74,7 +74,7 @@ export async function apiChangePassword(currentPassword: string, newPassword: st
 }
 
 // =============================================================
-// ÉLÈVES (formateur)
+// ÉTUDIANTS (formateur)
 // =============================================================
 
 export interface StudentWithProgress {
@@ -171,7 +171,7 @@ export async function apiGradeCompetency(
 }
 
 // =============================================================
-// PROGRESSION (élève)
+// PROGRESSION (étudiant)
 // =============================================================
 
 export interface ProgressRecord {
@@ -345,7 +345,7 @@ export interface MissionAssignmentData {
     teacherName: string;
 }
 
-// Sauvegarder une mission (prof ou élève)
+// Sauvegarder une mission (prof ou étudiant)
 export async function apiSaveMission(data: {
     title: string; content: string; platform: string;
     level: number; competencyIds: string[];

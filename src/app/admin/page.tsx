@@ -132,7 +132,7 @@ export default function AdminDashboardPage() {
                             <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
                                 <Users size={18} />
                             </div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Élèves</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Étudiants</span>
                         </div>
                         <div className="text-3xl font-black text-slate-900">{stats?.students || 0}</div>
                         <p className="text-xs text-slate-500 mt-1">Inscrits sur la plateforme</p>
@@ -227,7 +227,7 @@ export default function AdminDashboardPage() {
                                             </span>
                                             <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md">
                                                 <Users size={12} className="text-slate-300" />
-                                                {teacher._count.students} élèves
+                                                {teacher._count.students} étudiants
                                             </span>
                                             <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md">
                                                 <BookOpen size={12} className="text-slate-300" />

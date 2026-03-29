@@ -72,7 +72,7 @@ export function EvaluationTable({ students, type }: EvaluationTableProps) {
           </div>
           <div>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Effectif</p>
-            <p className="text-2xl font-black text-slate-800">{filtered.length} élèves</p>
+            <p className="text-2xl font-black text-slate-800">{filtered.length} étudiants</p>
           </div>
         </div>
         
@@ -130,7 +130,7 @@ export function EvaluationTable({ students, type }: EvaluationTableProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input 
             type="text" 
-            placeholder="Rechercher un élève..." 
+            placeholder="Rechercher un étudiant..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-purple-500 text-sm transition-colors"
@@ -144,7 +144,7 @@ export function EvaluationTable({ students, type }: EvaluationTableProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Élève</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Étudiant</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Classe</th>
                 {type === "E5B" && (
                   <>
@@ -272,7 +272,7 @@ export function EvaluationTable({ students, type }: EvaluationTableProps) {
           </table>
           {filtered.length === 0 && (
             <div className="p-12 text-center">
-              <p className="text-slate-400 text-sm font-medium italic">Aucun élève trouvé pour cette recherche.</p>
+              <p className="text-slate-400 text-sm font-medium italic">Aucun étudiant trouvé pour cette recherche.</p>
             </div>
           )}
         </div>

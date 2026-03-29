@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
         return apiSuccess(safeStudents);
     } catch (error) {
         console.error("[GET /api/students] Error:", error);
-        return apiError("Erreur serveur lors de la récupération des élèves", 500);
+        return apiError("Erreur serveur lors de la récupération des étudiants", 500);
     }
 }
 
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
             // 2. Hash password
             const passwordHash = await bcrypt.hash(s.password, 10);
 
-            // 3. Chercher si l'élève existe déjà
+            // 3. Chercher si l'étudiant existe déjà
             const existingStudent = await prisma.student.findFirst({
                 where: {
                     firstName: { equals: s.firstName, mode: "insensitive" },

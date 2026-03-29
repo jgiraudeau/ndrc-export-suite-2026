@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Tableau de Bord", href: "/teacher" },
   { icon: Users, label: "Mes Classes", href: "/teacher/students" },
   { icon: GraduationCap, label: "Épreuve E4", href: "/teacher/evaluations/e4" },
-  { icon: Target, label: "Missions & Projets", href: "/teacher/missions" },
+  { icon: Target, label: "Épreuve E5B", href: "/teacher/missions" },
   { icon: GraduationCap, label: "Épreuve E6", href: "/teacher/evaluations/e6" },
   { icon: Briefcase, label: "Passeport Pro", href: "/teacher/portfolio" },
   { icon: Sparkles, label: "Générateur IA", href: "/teacher/generate" },

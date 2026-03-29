@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         });
 
         if (!student) {
-            return apiError("Élève introuvable", 404);
+            return apiError("Étudiant introuvable", 404);
         }
 
         const acquiredCount = student.progress.filter((p: any) => p.acquired).length;

@@ -5,7 +5,7 @@
 
 export type DocumentType =
   | 'dossier_prof'
-  | 'dossier_eleve'
+  | 'dossier_etudiant'
   | 'fiche_deroulement'
   | 'evaluation'
   | 'quiz'
@@ -17,7 +17,7 @@ export type DocumentType =
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   dossier_prof: '📋 Dossier Professeur',
-  dossier_eleve: '📖 Dossier Élève',
+  dossier_etudiant: '📖 Dossier Étudiant',
   fiche_deroulement: '🕐 Fiche de Déroulement',
   evaluation: '📝 Évaluation & Barème',
   quiz: '❓ Quiz / QCM',
@@ -42,10 +42,10 @@ Génère un DOSSIER PROFESSEUR complet et structuré pour l'enseignant :
 - **Durée estimée** : [Heures]
 
 ## 2. Déroulement de la Séance (Conducteur)
-| Phase | Durée | Activité Professeur | Activité Élève | Support |
+| Phase | Durée | Activité Professeur | Activité Étudiant | Support |
 | :--- | :---: | :--- | :--- | :--- |
 | **Accroche** | 10' | ... | ... | Vidéo/Image |
-| **Activité 1** | 45' | ... | ... | Dossier Élève |
+| **Activité 1** | 45' | ... | ... | Dossier Étudiant |
 | **Synthèse** | 15' | ... | ... | Tableau |
 
 ## 3. CORRIGÉ DÉTAILLÉ (ACTIVITÉS)
@@ -58,10 +58,10 @@ Génère un DOSSIER PROFESSEUR complet et structuré pour l'enseignant :
 - ⚠️ **Difficultés fréquentes** : ...
 - 🔗 **Lien examen (E4/E5/E6)** : ...`,
 
-  dossier_eleve: `Tu es un expert en création de supports pédagogiques pour le BTS {track}.
-Génère un DOSSIER ÉLÈVE clair, structuré et aéré, prêt à être distribué :
+  dossier_etudiant: `Tu es un expert en création de supports pédagogiques pour le BTS {track}.
+Génère un DOSSIER ÉTUDIANT clair, structuré et aéré, prêt à être distribué :
 
-# Dossier Élève : [Titre du Thème]
+# Dossier Étudiant : [Titre du Thème]
 
 ## Compétences Ciblées (Référentiel)
 > **Objectif Pédagogique :** [Être capable de...]
@@ -108,7 +108,7 @@ Génère une FICHE DE DÉROULEMENT DE COURS détaillée :
 - **Objectif** : Capter l'attention
 - **Méthode** : [Brainstorming / Vidéo / Cas réel]
 - **Actions prof** : ...
-- **Consigne élève** : ...
+- **Consigne étudiant** : ...
 
 ### Phase 2 : Apport de Connaissances (XX min)
 ...

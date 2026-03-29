@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 
-// GET /api/students/[id] — détail complet d'un élève (formateur)
+// GET /api/students/[id] — détail complet d'un étudiant (formateur)
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     const auth = await requireAuth(request, ["TEACHER"]);
     if ("status" in auth) return auth;
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         });
 
         if (!student || student.teacherId !== auth.payload.sub) {
-            return apiError("Élève introuvable", 404);
+            return apiError("Étudiant introuvable", 404);
         }
 
         const acquiredCount = student.progress.filter((p: any) => p.acquired).length;
@@ -87,11 +87,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         });
 
         if (!existingStudent) {
-            return apiError("Élève introuvable", 404);
+            return apiError("Étudiant introuvable", 404);
         }
 
         if (existingStudent.teacherId !== auth.payload.sub) {
-            return apiError("Non autorisé à modifier cet élève", 403);
+            return apiError("Non autorisé à modifier cet étudiant", 403);
         }
 
         const dataToUpdate: any = {};
@@ -108,11 +108,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         });
 
         return apiSuccess({
-            message: "Élève mis à jour",
+            message: "Étudiant mis à jour",
             student: updatedStudent,
         });
     } catch (error) {
         console.error("[PATCH /api/students/[id]] Error:", error);
-        return apiError("Erreur serveur lors de la mise à jour de l'élève", 500);
+        return apiError("Erreur serveur lors de la mise à jour de l'étudiant", 500);
     }
 }

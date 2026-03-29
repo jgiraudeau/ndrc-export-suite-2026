@@ -12,7 +12,7 @@ export type JWTPayload = {
     sub: string;       // ID de l'utilisateur (teacher ou student)
     role: "TEACHER" | "STUDENT" | "ADMIN";
     name: string;
-    classCode?: string; // Pour les élèves uniquement
+    classCode?: string; // Pour les étudiants uniquement
     exp?: number;
 };
 

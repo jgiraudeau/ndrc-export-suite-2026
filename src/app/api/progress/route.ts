@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 import { progressUpdateSchema } from "@/lib/validations";
 
-// GET /api/progress — progression de l'élève connecté
+// GET /api/progress — progression de l'étudiant connecté
 export async function GET(request: NextRequest) {
 // ... (unchanged part skipped in chunk but I must replace from start line or specific lines)
     const auth = await requireAuth(request, ["STUDENT"]);

@@ -26,7 +26,7 @@ interface TeacherStore {
     importStudentsFromCSV: (csvContent: string) => { success: boolean, count: number, message?: string };
     addStudent: (student: Omit<Student, 'id' | 'progress'>) => void;
     removeStudent: (id: string) => void;
-    updateStudentProgress: (id: string, progress: number) => void; // Sera appelé par le dashboard élève en théorie
+    updateStudentProgress: (id: string, progress: number) => void; // Sera appelé par le dashboard étudiant en théorie
     resetData: () => void;
 }
 
@@ -106,7 +106,7 @@ export const useTeacherStore = create<TeacherStore>()(
                     });
                     return { success: true, count };
                 }
-                return { success: false, message: "Aucun élève valide trouvé.", count: 0 };
+                return { success: false, message: "Aucun étudiant valide trouvé.", count: 0 };
             },
 
             addStudent: (student) => set((state) => ({

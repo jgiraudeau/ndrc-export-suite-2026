@@ -10,7 +10,7 @@ export const MOCK_CLASSES = [
 
 export const MOCK_STUDENTS_AUTH = [
     { pin: '0000', name: 'Jacques (Test)', classCode: 'NDRC2' },
-    { pin: '0000', name: 'Test Élève 1', classCode: 'NDRC1' }, // Ajout pour faciliter le test
+    { pin: '0000', name: 'Test Étudiant 1', classCode: 'NDRC1' }, // Ajout pour faciliter le test
     { pin: '1234', name: 'Sophie Martin', classCode: 'NDRC2' },
 ];
 
@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthStore>()(
 
                 // 2. Fallback sur les Mocks (si pas trouvé dans l'import)
                 const validClass = MOCK_CLASSES.find(c => c.code.toUpperCase() === classCode.toUpperCase());
-                // Note: Si la classe existe dans les mocks mais pas l'élève, on check les mocks élèves
+                // Note: Si la classe existe dans les mocks mais pas l'étudiant, on check les mocks étudiants
 
                 const validStudentMock = MOCK_STUDENTS_AUTH.find(s => s.pin === pin && s.classCode.toUpperCase() === classCode.toUpperCase());
 

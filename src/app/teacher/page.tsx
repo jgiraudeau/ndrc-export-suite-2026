@@ -79,7 +79,7 @@ export default function TeacherDashboard() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
-            { label: "Élèves", value: stats.students, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "Étudiants", value: stats.students, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
             { label: "Classes", value: stats.classes, icon: Target, color: "text-purple-600", bg: "bg-purple-50" },
             { label: "Progression Moy.", value: `${stats.avgProgress}%`, icon: TrendingUp, color: "text-green-600", bg: "bg-green-50" },
             { label: "À Évaluer", value: stats.pendingEvals, icon: AlertCircle, color: "text-orange-600", bg: "bg-orange-50" },

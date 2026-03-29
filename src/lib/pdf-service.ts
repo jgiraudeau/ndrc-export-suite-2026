@@ -183,7 +183,7 @@ export const PDFService = {
   },
 
   /**
-   * Génère un support pédagogique général (Dossier Prof, Élève, Planning, etc.)
+   * Génère un support pédagogique général (Dossier Prof, Étudiant, Planning, etc.)
    * Gère les tableaux Markdown et le mode paysage.
    */
   generateAISupport: (metadata: any, content: string, track: string, options?: { orientation?: "portrait" | "landscape" }) => {

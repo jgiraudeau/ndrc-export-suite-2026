@@ -8,7 +8,7 @@ export async function POST(request: Request) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Simulation de validation
-        // En vrai, on appellerait l'endpoint /wp-json/ndrc/v1/status du site de l'élève
+        // En vrai, on appellerait l'endpoint /wp-json/ndrc/v1/status du site de l'étudiant
 
         if (!url || !url.startsWith('http')) {
             return NextResponse.json({

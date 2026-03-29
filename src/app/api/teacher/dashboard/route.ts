@@ -18,7 +18,7 @@ export async function GET(req: Request) {
         const studentCount = await prisma.student.count({ where: { teacherId } });
         const classCount = await prisma.class.count({ where: { teacherId } });
         
-        // On considère comme "à évaluer" les progrès élèves (acquired: true) sans teacherStatus
+        // On considère comme "à évaluer" les progrès étudiants (acquired: true) sans teacherStatus
         const pendingEvals = await prisma.progress.count({ 
             where: { 
                 student: { teacherId },

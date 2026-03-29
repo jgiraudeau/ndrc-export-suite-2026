@@ -50,7 +50,7 @@ export default function StudentLoginPage() {
                         <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mx-auto mb-4">
                             <User size={30} />
                         </div>
-                        <h1 className="text-xl font-black text-slate-800">Connexion Élève</h1>
+                        <h1 className="text-xl font-black text-slate-800">Connexion Étudiant</h1>
                         <p className="text-xs text-slate-400 mt-1">
                             Utilise ton identifiant et ton mot de passe
                         </p>

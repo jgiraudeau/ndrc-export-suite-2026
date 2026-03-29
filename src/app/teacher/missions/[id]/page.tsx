@@ -155,7 +155,7 @@ export default function TeacherMissionDetailPage() {
                     {/* Students List */}
                     <div className="lg:col-span-1 space-y-4">
                         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Users size={20} className="text-purple-500" /> Profils Élèves
+                            <Users size={20} className="text-purple-500" /> Profils Étudiants
                         </h2>
                         <div className="space-y-2">
                             {mission.assignments.map((assignment) => (
@@ -282,7 +282,7 @@ export default function TeacherMissionDetailPage() {
                                         ))
                                     ) : (
                                         <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                                            <p className="text-slate-400 font-bold text-sm">Cet élève n'a pas encore saisi d'actions.</p>
+                                            <p className="text-slate-400 font-bold text-sm">Cet étudiant n'a pas encore saisi d'actions.</p>
                                         </div>
                                     )}
                                 </div>
@@ -291,7 +291,7 @@ export default function TeacherMissionDetailPage() {
                             <div className="h-[600px] flex items-center justify-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                                 <div className="text-center italic text-slate-400">
                                     <Users size={32} className="mx-auto mb-4 opacity-20" />
-                                    Sélectionnez un élève pour voir son journal.
+                                    Sélectionnez un étudiant pour voir son journal.
                                 </div>
                             </div>
                         )}

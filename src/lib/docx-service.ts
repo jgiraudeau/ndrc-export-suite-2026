@@ -127,7 +127,7 @@ export const DOCXService = {
     },
 
     /**
-     * Génère un support pédagogique général (Dossier Prof, Élève, Planning, etc.)
+     * Génère un support pédagogique général (Dossier Prof, Étudiant, Planning, etc.)
      * Convertit les tableaux Markdown en tableaux natifs Word.
      */
     generateAISupport: async (metadata: any, content: string, track: string) => {

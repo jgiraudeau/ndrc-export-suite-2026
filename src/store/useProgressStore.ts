@@ -16,7 +16,7 @@ interface ProgressStore {
     getPlatformProgress: (platform: string) => number; // Retourne un % (0-100)
 }
 
-// Helper : récupère l'identité de l'élève connecté
+// Helper : récupère l'identité de l'étudiant connecté
 function getStudentIdentity() {
     const { user } = useAuthStore.getState();
     if (!user || user.role !== 'STUDENT') return null;

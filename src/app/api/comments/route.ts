@@ -15,13 +15,13 @@ export async function POST(request: NextRequest) {
             return apiError("studentId et text requis");
         }
 
-        // Vérifier que l'élève appartient bien à ce formateur
+        // Vérifier que l'étudiant appartient bien à ce formateur
         const student = await prisma.student.findFirst({
             where: { id: studentId, teacherId },
         });
 
         if (!student) {
-            return apiError("Élève introuvable", 404);
+            return apiError("Étudiant introuvable", 404);
         }
 
         const comment = await prisma.comment.create({

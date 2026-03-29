@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 
-// PATCH /api/progress/grade — évaluation formateur d'une compétence élève
+// PATCH /api/progress/grade — évaluation formateur d'une compétence étudiant
 export async function PATCH(request: NextRequest) {
     const auth = await requireAuth(request, ["TEACHER"]);
     if ("status" in auth) return auth;
@@ -19,15 +19,15 @@ export async function PATCH(request: NextRequest) {
             return apiError("teacherStatus doit être entre 0 et 4");
         }
 
-        // Vérifier que l'élève appartient à ce formateur
+        // Vérifier que l'étudiant appartient à ce formateur
         const student = await prisma.student.findFirst({
             where: { id: studentId, teacherId },
         });
         if (!student) {
-            return apiError("Élève introuvable ou non autorisé", 404);
+            return apiError("Étudiant introuvable ou non autorisé", 404);
         }
 
-        // Upsert : crée un Progress si l'élève n'a pas encore auto-évalué
+        // Upsert : crée un Progress si l'étudiant n'a pas encore auto-évalué
         const record = await prisma.progress.upsert({
             where: { studentId_competencyId: { studentId, competencyId } },
             create: {

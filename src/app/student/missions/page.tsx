@@ -119,7 +119,7 @@ export default function MissionsPage() {
                         <div className="w-8 h-8 rounded-full flex items-center justify-center bg-indigo-100 text-indigo-600">
                             <Target size={16} className="stroke-[3]" />
                         </div>
-                        <h1 className="font-extrabold text-slate-700 text-lg tracking-tight">Missions</h1>
+                        <h1 className="font-extrabold text-slate-700 text-lg tracking-tight">Épreuve E5B</h1>
                     </div>
                     <div className="w-8" />
                 </div>
@@ -131,7 +131,7 @@ export default function MissionsPage() {
                     <button onClick={() => setTab("assigned")}
                         className={cn("flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
                             tab === "assigned" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500")}>
-                        Mes missions {pendingCount > 0 && <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center">{pendingCount}</span>}
+                        Mes épreuves {pendingCount > 0 && <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center">{pendingCount}</span>}
                     </button>
                     <button onClick={() => setTab("generate")}
                         className={cn("flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
@@ -146,8 +146,8 @@ export default function MissionsPage() {
                         {assignedMissions.length === 0 ? (
                             <div className="text-center py-12 text-slate-400">
                                 <Target size={48} className="mx-auto mb-3 opacity-30" />
-                                <p className="font-bold">Aucune mission assignée</p>
-                                <p className="text-sm mt-1">Ton formateur t'assignera des missions ici</p>
+                                <p className="font-bold">Aucune épreuve assignée</p>
+                                <p className="text-sm mt-1">Ton formateur t'assignera des épreuves ici</p>
                             </div>
                         ) : assignedMissions.map(mission => (
                             <div key={mission.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -232,7 +232,7 @@ export default function MissionsPage() {
                                     <div className="bg-amber-100 p-4 rounded-full text-amber-600">
                                         <Sparkles size={32} />
                                     </div>
-                                    <h2 className="text-xl font-black text-slate-800">Créer une Mission</h2>
+                                    <h2 className="text-xl font-black text-slate-800">Créer une Épreuve E5B</h2>
                                     <p className="text-slate-500 text-sm">
                                         Paramètre les objectifs de ton entraînement. L'IA générera un scénario sur mesure.
                                     </p>

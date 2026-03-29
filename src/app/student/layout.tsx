@@ -2,12 +2,14 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Target, Globe, ShoppingBag, LogOut, Briefcase, BookOpen } from "lucide-react";
+import { LayoutDashboard, Target, Globe, ShoppingBag, LogOut, Briefcase, BookOpen, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
     { href: "/student", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
-    { href: "/student/missions", label: "Missions", icon: Target },
+    { href: "/student/evaluations/e4", label: "Épreuve E4", icon: GraduationCap },
+    { href: "/student/missions", label: "Épreuve E5B", icon: Target },
+    { href: "/student/evaluations/e6", label: "Épreuve E6", icon: GraduationCap },
     { href: "/student/journal", label: "Journal de Bord", icon: BookOpen },
     { href: "/student/wordpress", label: "WordPress", icon: Globe },
     { href: "/student/prestashop", label: "PrestaShop", icon: ShoppingBag },

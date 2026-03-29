@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest) {
         });
 
         if (!student) {
-            return apiError("Élève introuvable", 404);
+            return apiError("Étudiant introuvable", 404);
         }
 
         const valid = await bcrypt.compare(currentPassword, student.passwordHash);

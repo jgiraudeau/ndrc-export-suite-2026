@@ -49,13 +49,13 @@ export default function TeacherMissionsPage() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-3xl font-black text-slate-800 tracking-tight">
-                            Missions <span className="text-purple-600">& Projets</span>
+                            Épreuve <span className="text-purple-600">E5B</span>
                         </h1>
-                        <p className="text-slate-500 font-medium">Gérez les activités pédagogiques et suivez l&apos;implication des élèves.</p>
+                        <p className="text-slate-500 font-medium">Gérez les activités pédagogiques et suivez l&apos;implication des étudiants.</p>
                     </div>
                     
                     <button className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-2xl font-black uppercase tracking-wider text-xs shadow-xl shadow-purple-200 hover:bg-purple-700 transition-all hover:-translate-y-1">
-                        <PlusCircle size={18} /> Nouvelle Mission
+                        <PlusCircle size={18} /> Nouvelle Épreuve
                     </button>
                 </div>
 
@@ -67,7 +67,7 @@ export default function TeacherMissionsPage() {
                         </div>
                         <div>
                             <div className="text-2xl font-black text-slate-800">{missions.length}</div>
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Missions actives</div>
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Épreuves actives</div>
                         </div>
                     </div>
                     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
@@ -78,7 +78,7 @@ export default function TeacherMissionsPage() {
                             <div className="text-2xl font-black text-slate-800">
                                 {missions.reduce((acc, m) => acc + m._count.assignments, 0)}
                             </div>
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Participations élèves</div>
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Participations étudiants</div>
                         </div>
                     </div>
                     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 group cursor-pointer hover:border-purple-200 transition-colors">
@@ -98,7 +98,7 @@ export default function TeacherMissionsPage() {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-purple-500 transition-colors" size={18} />
                         <input 
                             type="text" 
-                            placeholder="Rechercher une mission..." 
+                            placeholder="Rechercher une épreuve..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-white pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium"
@@ -136,7 +136,7 @@ export default function TeacherMissionsPage() {
                                     </h3>
                                     <div className="flex items-center gap-4 pt-2">
                                         <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
-                                            <Users size={14} /> {mission._count.assignments} élèves
+                                            <Users size={14} /> {mission._count.assignments} étudiants
                                         </div>
                                         <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
                                             <Clock size={14} /> {new Date(mission.createdAt).toLocaleDateString()}
@@ -159,10 +159,10 @@ export default function TeacherMissionsPage() {
                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
                             <BookOpen size={30} />
                         </div>
-                        <h4 className="text-lg font-black text-slate-800">Aucune mission trouvée</h4>
+                        <h4 className="text-lg font-black text-slate-800">Aucune épreuve trouvée</h4>
                         <p className="text-slate-500 text-sm font-medium mt-1">Commencez par créer votre première mission pédagogique.</p>
                         <button className="mt-6 px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-xs text-purple-600 hover:bg-purple-50 transition-all shadow-sm">
-                            Créer ma première mission
+                            Créer ma première épreuve
                         </button>
                     </div>
                 )}

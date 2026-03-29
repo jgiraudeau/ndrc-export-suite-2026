@@ -8,7 +8,7 @@ import { verifyToken, extractToken } from '@/lib/jwt';
 const GenerateSchema = z.object({
   topic: z.string().min(3, 'Le sujet est requis'),
   documentType: z.enum([
-    'dossier_prof', 'dossier_eleve', 'fiche_deroulement',
+    'dossier_prof', 'dossier_etudiant', 'fiche_deroulement',
     'evaluation', 'quiz', 'planning_annuel',
     'jeu_de_role', 'jeu_de_role_evenement',
     'sujet_e5b_wp', 'sujet_e5b_presta',

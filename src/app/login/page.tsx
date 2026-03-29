@@ -33,7 +33,7 @@ export default function LoginPage() {
             </div>
             <h2 className="text-2xl font-black text-slate-800 mb-3 uppercase tracking-tight">Espace Formateur</h2>
             <p className="text-slate-400 font-medium text-sm leading-relaxed mb-8">
-              Gérez vos classes, suivez les missions E5 et validez les compétences transversales de vos élèves.
+              Gérez vos classes, suivez les missions E5 et validez les compétences transversales de vos étudiants.
             </p>
             <div className="mt-auto flex items-center gap-2 text-purple-600 font-black text-xs uppercase tracking-widest bg-purple-50 px-6 py-3 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-all">
               Accéder <ArrowRight size={16} />

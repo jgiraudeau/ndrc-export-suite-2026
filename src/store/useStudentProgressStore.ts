@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { ALL_COMPETENCIES } from '@/data/competencies';
 
-// Enregistrement de progression pour UN élève
+// Enregistrement de progression pour UN étudiant
 export interface StudentRecord {
     studentId: string;         // ex: "NDRC1-1234"
     studentName: string;       // ex: "Thomas Dupont"
@@ -19,13 +19,13 @@ interface TeacherComment {
 }
 
 interface StudentProgressStore {
-    // Progression des élèves (clé = studentId)
+    // Progression des étudiants (clé = studentId)
     records: Record<string, StudentRecord>;
 
     // Commentaires du formateur (clé = studentId)
     teacherComments: Record<string, TeacherComment[]>;
 
-    // Actions élève
+    // Actions étudiant
     recordProgress: (
         studentId: string,
         studentName: string,

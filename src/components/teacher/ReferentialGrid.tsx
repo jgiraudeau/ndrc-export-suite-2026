@@ -35,9 +35,10 @@ interface ReferentialGridProps {
   title?: string;
   type?: "E4" | "E6";
   initialGrades?: Record<string, number>;
+  readOnly?: boolean;
 }
 
-export function ReferentialGrid({ studentId, referential, title, type, initialGrades = {} }: ReferentialGridProps) {
+export function ReferentialGrid({ studentId, referential, title, type, initialGrades = {}, readOnly = false }: ReferentialGridProps) {
   const [expandedCodes, setExpandedCodes] = useState<Record<string, boolean>>({});
   const [currentGrades, setCurrentGrades] = useState<Record<string, number>>(initialGrades);
   const [dirtyCodes, setDirtyCodes] = useState<Set<string>>(new Set());
@@ -55,6 +56,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   ];
 
   const handleGradeLocal = (competencyCode: string, childIdx: number, grade: number) => {
+    if (readOnly) return;
     const key = `${competencyCode}_${childIdx}`;
     setCurrentGrades(prev => ({ ...prev, [key]: grade }));
     setDirtyCodes(prev => new Set(prev).add(competencyCode));
@@ -171,16 +173,19 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                               {GRADE_LEVELS.map((level) => {
                                 const isActive = currentGrade === level.value;
                                 return (
-                                  <button
-                                    key={level.value}
-                                    onClick={() => handleGradeLocal(comp.code, idx, level.value)}
-                                    className={cn(
-                                      "flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all h-20 text-center",
-                                      isActive 
-                                        ? "ring-2 ring-purple-100 border-purple-300 " + level.color
-                                        : "bg-slate-50/50 border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600"
-                                    )}
-                                  >
+                                    <button
+                                      key={level.value}
+                                      onClick={() => handleGradeLocal(comp.code, idx, level.value)}
+                                      disabled={readOnly}
+                                      className={cn(
+                                        "flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all h-20 text-center",
+                                        isActive 
+                                          ? "ring-2 ring-purple-100 border-purple-300 " + level.color
+                                          : "bg-slate-50/50 border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600",
+                                        readOnly && !isActive && "opacity-30 grayscale cursor-not-allowed",
+                                        readOnly && isActive && "cursor-default"
+                                      )}
+                                    >
                                     <span className="text-[10px] font-black uppercase tracking-tight leading-none">{level.label}</span>
                                   </button>
                                 );
@@ -191,7 +196,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                       );
                     })}
 
-                    {isDirty && (
+                    {isDirty && !readOnly && (
                       <div className="flex justify-end pt-4 border-t border-slate-100">
                         <button 
                             onClick={() => handleSaveCompetency(comp.code)}

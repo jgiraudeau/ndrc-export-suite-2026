@@ -6,275 +6,213 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================================
-// FORMATEUR
-// ============================================================
 model Teacher {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  status       String    @default("pending")  // "pending", "active", "rejected"
-  consentGivenAt DateTime? // Suivi RGPD
-  createdAt    DateTime  @default(now())
-
-  students           Student[]
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  passwordHash       String
+  name               String
+  status             String              @default("pending")
+  consentGivenAt     DateTime?
+  createdAt          DateTime            @default(now())
   classes            Class[]
   comments           Comment[]
-  missionAssignments MissionAssignment[]
   evaluationsGiven   Evaluation[]
+  missionAssignments MissionAssignment[]
   savedDocuments     SavedDocument[]
+  students           Student[]
 }
 
-// ============================================================
-// CLASSE
-// ============================================================
 model Class {
-  id        String   @id @default(cuid())
-  code      String                      // ex: "NDRC1"
-  name      String                      // ex: "BTS NDRC 1ère Année"
-  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  code      String
+  name      String
   teacherId String
-  createdAt DateTime @default(now())
-
+  createdAt DateTime  @default(now())
+  teacher   Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   students  Student[]
 
-  @@unique([code, teacherId])           // Un code unique par formateur
+  @@unique([code, teacherId])
 }
 
-// ============================================================
-// ÉLÈVE
-// ============================================================
 model Student {
-  id           String   @id @default(cuid())
-  firstName    String
-  lastName     String
-  identifier   String   @unique          // ex: jean.dupont (auto-généré)
-  passwordHash String                        // Mot de passe hashé avec bcrypt
-  wpUrl        String?                        // URL du site WordPress de l'élève
-  prestaUrl    String?                        // URL du site PrestaShop de l'élève
-  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  teacherId   String
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  classId     String
-  consentGivenAt DateTime? // Suivi RGPD
-  createdAt   DateTime @default(now())
-
-  progress  Progress[]
-  comments  Comment[]
-  missions  MissionAssignment[]
+  id                  String                   @id @default(cuid())
+  firstName           String
+  lastName            String
+  identifier          String                   @unique
+  passwordHash        String
+  wpUrl               String?
+  prestaUrl           String?
+  teacherId           String
+  classId             String
+  consentGivenAt      DateTime?
+  createdAt           DateTime                 @default(now())
+  comments            Comment[]
   evaluationsOfficial Evaluation[]
-  experiences ProfessionalExperience[]
+  missions            MissionAssignment[]
+  experiences         ProfessionalExperience[]
+  progress            Progress[]
+  class               Class                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher             Teacher                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
-  @@unique([classId, firstName, lastName]) // Pas de doublon dans la même classe
+  @@unique([classId, firstName, lastName])
 }
 
-// ============================================================
-// PROGRESSION (1 ligne = 1 compétence validée)
-// ============================================================
 model Progress {
-  id           String   @id @default(cuid())
-  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  studentId    String
-  competencyId String                   // ex: "wp-niv1-identite"
-  acquired     Boolean  @default(false)
-  status       Int      @default(0)       // 0=Non évalué, 1=Novice, 2=Apprenti, 3=Compétent, 4=Expert
-  proof        String?                   // URL ou commentaire de l'élève
-  updatedAt    DateTime @updatedAt
+  id              String    @id @default(cuid())
+  studentId       String
+  competencyId    String
+  acquired        Boolean   @default(false)
+  status          Int       @default(0)
+  proof           String?
+  updatedAt       DateTime  @updatedAt
+  teacherStatus   Int?
+  teacherFeedback String?
+  teacherGradedAt DateTime?
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  // Évaluation formateur
-  teacherStatus    Int?                 // 0-4, null = pas encore évalué par le prof
-  teacherFeedback  String?              // Annotation par compétence
-  teacherGradedAt  DateTime?            // Date de dernière évaluation prof
-
-  @@unique([studentId, competencyId])   // 1 enregistrement par compétence par élève
+  @@unique([studentId, competencyId])
 }
 
-// ============================================================
-// COMMENTAIRES DU FORMATEUR
-// ============================================================
 model Comment {
   id        String   @id @default(cuid())
   text      String
-  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   teacherId String
-  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId String
   createdAt DateTime @default(now())
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 }
 
-// ============================================================
-// MISSION (générée par IA ou créée manuellement)
-// ============================================================
 model Mission {
-  id            String   @id @default(cuid())
+  id            String              @id @default(cuid())
   title         String
-  content       String                        // Markdown de la mission
-  platform      String                        // "WORDPRESS" | "PRESTASHOP"
-  level         Int      @default(2)          // 1-4
-  competencyIds String[]                      // IDs des compétences ciblées
-  createdBy     String                        // ID Teacher ou Student
-  createdByRole String                        // "TEACHER" | "STUDENT"
-  createdAt     DateTime @default(now())
-
-  assignments MissionAssignment[]
+  content       String
+  platform      String
+  level         Int                 @default(2)
+  competencyIds String[]
+  createdBy     String
+  createdByRole String
+  createdAt     DateTime            @default(now())
+  assignments   MissionAssignment[]
 }
 
-// ============================================================
-// AFFECTATION DE MISSION
-// ============================================================
 model MissionAssignment {
-  id          String    @id @default(cuid())
-  mission     Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid())
   missionId   String
-  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId   String
-  teacher     Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   teacherId   String
-  status      String    @default("pending")   // "pending" | "in_progress" | "completed"
-  assignedAt  DateTime  @default(now())
+  status      String         @default("pending")
+  assignedAt  DateTime       @default(now())
   completedAt DateTime?
-
   journal     JournalEntry[]
+  mission     Mission        @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  student     Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher     Teacher        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
   @@unique([missionId, studentId])
 }
 
-// ============================================================
-// RÉFÉRENTIELS (E4 / E6)
-// ============================================================
 model Competency {
-  id          String   @id @default(cuid())
-  code        String   @unique
+  id          String                @id @default(cuid())
+  code        String                @unique
   description String
-  block       String   // "E4", "E5", "E6"
-  createdAt   DateTime @default(now())
-
+  block       String
+  createdAt   DateTime              @default(now())
   criteria    AssessmentCriterion[]
 }
 
 model AssessmentCriterion {
-  id           String   @id @default(cuid())
-  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  id           String            @id @default(cuid())
   competencyId String
   description  String
-  weight       Float    @default(1.0)
-  
+  weight       Float             @default(1.0)
+  competency   Competency        @relation(fields: [competencyId], references: [id], onDelete: Cascade)
   scores       EvaluationScore[]
 }
 
-// ============================================================
-// ÉVALUATIONS OFFFICIELLES (E4/E6)
-// ============================================================
 model EvaluationSession {
-  id        String   @id @default(cuid())
-  name      String
-  startDate DateTime
-  endDate   DateTime
-
+  id          String       @id @default(cuid())
+  name        String
+  startDate   DateTime
+  endDate     DateTime
   evaluations Evaluation[]
 }
 
 model Evaluation {
-  id            String   @id @default(cuid())
-  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id            String             @id @default(cuid())
   studentId     String
-  evaluator     Teacher  @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
   evaluatorId   String
-  session       EvaluationSession? @relation(fields: [sessionId], references: [id])
   sessionId     String?
-
   date          DateTime
-  type          String   @default("formative") // "formative", "certificative"
-  situation     String   // "situation_a", "situation_b", "oral_e6", "other"
+  type          String             @default("formative")
+  situation     String
   globalComment String?
-
+  createdAt     DateTime           @default(now())
+  evaluator     Teacher            @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+  session       EvaluationSession? @relation(fields: [sessionId], references: [id])
+  student       Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
   scores        EvaluationScore[]
-  createdAt     DateTime @default(now())
 }
 
 model EvaluationScore {
-  id           String   @id @default(cuid())
-  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  id           String              @id @default(cuid())
   evaluationId String
-  criterion    AssessmentCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
   criterionId  String
-  
   score        Float
   comment      String?
+  criterion    AssessmentCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  evaluation   Evaluation          @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 }
 
-// ============================================================
-// DOCUMENTS SAUVEGARDÉS (Générateur Pédagogique)
-// ============================================================
 model SavedDocument {
   id           String   @id @default(cuid())
   title        String
-  content      String   @db.Text
-  documentType String   // ex: "dossier_prof", "quiz"...
-  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  content      String
+  documentType String
   teacherId    String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 }
 
-// ============================================================
-// PASSEPORT DE PROFESSIONNALISATION (Transversal E4/E5/E6)
-// ============================================================
 model ProfessionalExperience {
-  id            String   @id @default(cuid())
+  id            String         @id @default(cuid())
   title         String
-  type          String   // "STAGE" | "PROJET" | "MISSION"
-  description   String   @db.Text
+  type          String
+  description   String
   startDate     DateTime
   endDate       DateTime?
-  
-  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId     String
-  
-  // IDs des compétences mobilisées (mélange E4, E5, E6)
-  competencyIds String[] 
-  
-  status        String   @default("DRAFT") // "DRAFT" | "SUBMITTED" | "VALIDATED"
-  feedback      String?  @db.Text          // Commentaire du professeur
-  
+  competencyIds String[]
+  status        String         @default("DRAFT")
+  feedback      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   journal       JournalEntry[]
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
-// ============================================================
-// JOURNAL DE BORD (Logs des exercices/stages/projets)
-// ============================================================
 model JournalEntry {
-  id          String   @id @default(cuid())
-  date        DateTime @default(now())
-  content     String   @db.Text
-  proofs      String[] // URLs vers images/documents (local/legacy)
-  links       String[] // Liens externes (Drive, OneDrive, etc.)
-  
-  teacherComment String?  @db.Text
-  isValidated    Boolean  @default(false)
-  
-  experience    ProfessionalExperience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-  experienceId  String?
-  
-  assignment    MissionAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  assignmentId  String?
-  
-  createdAt     DateTime @default(now())
+  id             String                  @id @default(cuid())
+  date           DateTime                @default(now())
+  content        String
+  proofs         String[]
+  links          String[]
+  teacherComment String?
+  isValidated    Boolean                 @default(false)
+  experienceId   String?
+  assignmentId   String?
+  createdAt      DateTime                @default(now())
+  assignment     MissionAssignment?      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  experience     ProfessionalExperience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
 }
 
-// ============================================================
-// NOTIFICATIONS (Boucle de feedback)
-// ============================================================
 model Notification {
   id        String   @id @default(cuid())
-  userId    String   // ID de l'étudiant récepteur
+  userId    String
   title     String
-  message   String   @db.Text
-  type      String   // "FEEDBACK" | "VALIDATION" | "MISSION"
+  message   String
+  type      String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 }
