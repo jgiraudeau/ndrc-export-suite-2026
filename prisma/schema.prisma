@@ -51,6 +51,7 @@ model Student {
   missions            MissionAssignment[]
   experiences         ProfessionalExperience[]
   progress            Progress[]
+  chatSessions        ChatSession[]
   class               Class                    @relation(fields: [classId], references: [id], onDelete: Cascade)
   teacher             Teacher                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
@@ -215,4 +216,22 @@ model Notification {
   type      String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  title     String
+  studentId String
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
+  student   Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  role      String
+  content   String
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

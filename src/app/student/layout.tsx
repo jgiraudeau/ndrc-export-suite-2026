@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Target, Globe, ShoppingBag, LogOut, Briefcase, BookOpen, GraduationCap } from "lucide-react";
+import { LayoutDashboard, Target, Globe, ShoppingBag, LogOut, Briefcase, BookOpen, GraduationCap, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
     { href: "/student/wordpress", label: "WordPress", icon: Globe },
     { href: "/student/prestashop", label: "PrestaShop", icon: ShoppingBag },
     { href: "/student/portfolio", label: "Passeport Pro", icon: Briefcase },
+    { href: "/student/chat", label: "Tuteur IA", icon: MessageSquare },
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {

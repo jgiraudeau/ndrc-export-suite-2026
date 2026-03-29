@@ -12,7 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
-  Briefcase
+  Briefcase,
+  MessageSquare
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { icon: Target, label: "Épreuve E5B", href: "/teacher/missions" },
   { icon: GraduationCap, label: "Épreuve E6", href: "/teacher/evaluations/e6" },
   { icon: Briefcase, label: "Passeport Pro", href: "/teacher/portfolio" },
+  { icon: MessageSquare, label: "Suivi IA", href: "/teacher/suivi-ia" },
   { icon: Sparkles, label: "Générateur IA", href: "/teacher/generate" },
 ];
 
