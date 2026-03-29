@@ -2,6 +2,8 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { type ProfessionalExperience } from "./api-client";
 import { TRANSVERSAL_REFERENTIAL } from "@/data/transversal-referential";
+import { MarkdownParser } from "./markdown-parser";
+
 
 // Extend jsPDF type for autotable
 interface jsPDFWithAutoTable extends jsPDF {
@@ -180,58 +182,113 @@ export const PDFService = {
     doc.save(`JOURNAL_NDRC_${student.lastName.toUpperCase()}.pdf`);
   },
 
-  generateAISupport: (metadata: any, content: string, track: string) => {
-      const doc = new jsPDF();
+  /**
+   * Génère un support pédagogique général (Dossier Prof, Élève, Planning, etc.)
+   * Gère les tableaux Markdown et le mode paysage.
+   */
+  generateAISupport: (metadata: any, content: string, track: string, options?: { orientation?: "portrait" | "landscape" }) => {
+      const doc = new jsPDF({ 
+          orientation: options?.orientation || "portrait",
+          unit: "mm",
+          format: "a4"
+      }) as jsPDFWithAutoTable;
+      
       const { title, filename } = metadata;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
       // Branding
       doc.setFillColor(15, 23, 42); // Slate 900
-      doc.rect(0, 0, 210, 40, "F");
+      doc.rect(0, 0, pageWidth, 40, "F");
       
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
+      doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
-      doc.text("NDRC EXPORT SUITE", 20, 20);
+      doc.text("NDRC EXPORT SUITE", 20, 18);
       
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      doc.text(`SUPPORT PÉDAGOGIQUE | ${track.toUpperCase()} | ${new Date().toLocaleDateString("fr-FR")}`, 20, 30);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`SUPPORT PÉDAGOGIQUE | ${track.toUpperCase()} | ${new Date().toLocaleDateString("fr-FR")}`, 20, 26);
+      doc.text(title.toUpperCase(), 20, 32);
 
-      // Content
+      // Séparation du contenu : Texte vs Tableaux
+      const tableData = MarkdownParser.extractTable(content);
+      const textOnly = MarkdownParser.removeTables(content);
+
+      // Rendu du Texte
       doc.setTextColor(30, 41, 59);
       doc.setFontSize(11);
       
-      const splitText = doc.splitTextToSize(content, 170);
-      let y = 60;
+      const splitText = doc.splitTextToSize(textOnly, pageWidth - 40);
+      let y = 55;
       
       splitText.forEach((line: string) => {
-          if (y > 270) {
+          if (y > pageHeight - 30) {
               doc.addPage();
               y = 20;
           }
-          // Simple markdown-ish check
+          
           if (line.startsWith("#")) {
+              const level = line.match(/^#+/)?.[0].length || 1;
               doc.setFont("helvetica", "bold");
-              doc.setFontSize(14);
+              doc.setFontSize(level === 1 ? 16 : level === 2 ? 14 : 12);
+              doc.setTextColor(79, 70, 229); // Indigo 600 for headings
               doc.text(line.replace(/#/g, "").trim(), 20, y);
+              y += (level === 1 ? 12 : 10);
               doc.setFontSize(11);
               doc.setFont("helvetica", "normal");
-              y += 10;
+              doc.setTextColor(30, 41, 59);
           } else {
               doc.text(line, 20, y);
               y += 7;
           }
       });
 
-      // Add Signature line at the end
-      if (y > 250) { doc.addPage(); y = 20; }
-      doc.setDrawColor(203, 213, 225);
-      doc.line(20, y + 20, 80, y + 20);
-      doc.setFontSize(8);
-      doc.text("VISA FORMATEUR", 20, y + 25);
+      // Rendu du Tableau (si présent)
+      if (tableData) {
+          if (y > pageHeight - 60) {
+              doc.addPage();
+              y = 20;
+          }
+          
+          autoTable(doc, {
+              startY: y + 5,
+              head: tableData.head,
+              body: tableData.body,
+              theme: 'grid',
+              headStyles: { 
+                  fillColor: [79, 70, 229], 
+                  fontStyle: 'bold', 
+                  fontSize: options?.orientation === "landscape" ? 9 : 8 
+              },
+              bodyStyles: { 
+                  fontSize: options?.orientation === "landscape" ? 8 : 7,
+                  cellPadding: 3 
+              },
+              margin: { left: 20, right: 20 },
+              styles: { overflow: 'linebreak', cellWidth: 'wrap' },
+              columnStyles: {
+                  0: { cellWidth: options?.orientation === "landscape" ? 25 : 20 },
+                  1: { cellWidth: 'auto' }
+              }
+          });
+          
+          y = (doc as any).lastAutoTable.finalY + 15;
+      }
 
+      // Visa Formateur
+      if (y > pageHeight - 40) { doc.addPage(); y = 20; }
+      doc.setDrawColor(203, 213, 225);
+      doc.line(20, y + 10, 80, y + 10);
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text("VISA FORMATEUR / CACHET ET DATE", 20, y + 15);
+
+      drawFooter(doc);
       doc.save(`${filename || "Support_NDRC"}.pdf`);
   },
+
 
   /**
    * Génère une grille d'évaluation (E4 ou E6)

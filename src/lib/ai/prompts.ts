@@ -150,28 +150,35 @@ Génère 5 à 10 questions (QCM ou questions ouvertes courtes).
 **IMPORTANT** : Pour chaque question, fournis la réponse correcte ET une explication détaillée du "Pourquoi" basée sur le référentiel.`,
 
   planning_annuel: `Tu es un expert en ingénierie de formation pour le BTS {track}.
-Ta mission est de générer une PROGRESSION PÉDAGOGIQUE détaillée.
+Ta mission est de générer une PROGRESSION PÉDAGOGIQUE annuelle (Septembre à Juin) extrêmement précise sous forme de TABLEAU.
 
 RÈGLES D'OR :
 1. RESPECTE STRICTEMENT le Référentiel du BTS {track}.
-2. SÉPARE clairement les périodes de formation et les périodes en entreprise.
-3. SOIS PRÉCIS : Indique les semaines, les thèmes, les compétences visées.
+2. FORMAT TABLEAU UNIQUE : Toute la progression doit être dans un seul grand tableau Markdown.
+3. ADAPTATION : Alterne entre apports théoriques, TD d'application, et préparation aux examens (CCF).
 
-# Structure Attendue :
+COLONNES DU TABLEAU :
+| Période (Mois / Sem.) | Séquence / Thème | Objectifs Pédagogiques | Bloc / Compétences | Activités & Supports | Évaluation |
+| :--- | :--- | :--- | :--- | :--- | :--- |
 
-## 1. Vue d'Ensemble
-[Résumé du calendrier]
+CONTENU ATTENDU :
+- S1-S2 Septembre : Intégration, méthodologie, fondamentaux.
+- Octobre à Mai : Déclinaison des Blocs (Bloc 1, 2, 3 pour NDRC).
+- Périodes de stage (PFMP) : Indique clairement les 8 semaines de stage (généralement Nov/Déc ou Janv/Fév).
+- Juin : Révisions finales et bilans.
 
-## 2. Progression Détaillée
-| Période / Semaine | Bloc / Matière | Thème & Savoirs | Compétences Visées | Activités | Évaluation |
-|---|---|---|---|---|---|
-| Sept. S1-S2 | Bloc 1 | ... | ... | TD, Cas pratique | Formatif |
+# PROGRESSION PÉDAGOGIQUE ANNUELLE : {track}
+[Introduction brève de 2 lignes sur la stratégie de l'année]
 
-## 3. Périodes en Entreprise
-- Objectifs à atteindre durant les stages.
+| Période | Séquence | Objectifs | Bloc / Compétences | Activités | Évaluation |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Sept. S1-S2 | ... | ... | ... | ... | ... |
+
+## 3. Périodes en Entreprise (PFMP)
+- Détails des objectifs de stage.
 
 ## 4. Examens et Certification
-- Planning prévisionnel des CCF ou Examens Blancs.`,
+- Planning des Examens Blancs et CCF.`,
 
   jeu_de_role: `Tu es un expert créateur de sujets d'examen certifiants pour le BTS NDRC (Épreuve E4).
 Ta mission est de générer les DEUX fiches (Candidat et Jury) pour une simulation de Négociation Vente.

@@ -96,7 +96,8 @@ export default function TeacherGenerate() {
         PDFService.generateAISupport(
             { title: topic, filename: generatedFilename },
             generatedContent,
-            track
+            track,
+            { orientation: docType === "planning_annuel" ? "landscape" : "portrait" }
         );
     };
 
