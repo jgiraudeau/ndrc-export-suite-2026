@@ -108,7 +108,7 @@ export default function StudentE4Page() {
                             if (!studentData) return;
                             const GRADE_LABELS: Record<number, string> = { 1: "Très insuffisant", 2: "Insuffisant", 3: "Satisfaisant", 4: "Très satisfaisant" };
                             PDFExportService.generateOfficialEvaluation({
-                                studentName: `${studentData.firstName} ${studentData.lastName}`,
+                                studentName: studentData.name,
                                 evaluationType: "E4",
                                 teacherName: evaluation?.evaluator?.name || "Formateur NDRC",
                                 date: new Date().toISOString(),

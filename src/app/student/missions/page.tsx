@@ -168,7 +168,7 @@ export default function MissionsPage() {
                                 const badge = calculateBadge(progress.filter((p: any) => p.teacherStatus != null).length, progress.length);
                                 PDFExportService.generateBadgeExport({
                                     title: "Épreuve E5B - Dossier de Missions",
-                                    studentName: `${studentData.firstName} ${studentData.lastName}`,
+                                    studentName: studentData.name,
                                     badge: badge,
                                     items: assignedMissions.map(m => ({
                                         title: m.title,
