@@ -55,7 +55,24 @@ export async function middleware(request: NextRequest) {
         }
     }
 
+    // Protection des routes Administration
+    if (pathname.startsWith("/admin")) {
+        // Exclure la page de login de la protection
+        if (pathname === "/admin/login") {
+            return NextResponse.next();
+        }
+
+        if (!token) {
+            return NextResponse.redirect(new URL("/admin/login", request.url));
+        }
+        const payload = await verifyToken(token);
+        if (!payload || payload.role !== "ADMIN") {
+            return NextResponse.redirect(new URL("/admin/login", request.url));
+        }
+    }
+
     // Protection des routes API (hors auth publique)
+
     if (pathname.startsWith("/api") && !pathname.startsWith("/api/auth")) {
         if (!token) {
             return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
@@ -72,6 +89,7 @@ export async function middleware(request: NextRequest) {
 // Configurer le matcher pour optimiser les performances
 export const config = {
     matcher: [
+        "/admin/:path*",
         "/teacher/:path*",
         "/student/:path*",
         "/api/:path*",
