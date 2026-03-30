@@ -46,12 +46,12 @@ model Student {
   classId             String
   consentGivenAt      DateTime?
   createdAt           DateTime                 @default(now())
+  chatSessions        ChatSession[]
   comments            Comment[]
   evaluationsOfficial Evaluation[]
   missions            MissionAssignment[]
   experiences         ProfessionalExperience[]
   progress            Progress[]
-  chatSessions        ChatSession[]
   class               Class                    @relation(fields: [classId], references: [id], onDelete: Cascade)
   teacher             Teacher                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
@@ -148,9 +148,9 @@ model Evaluation {
   type          String             @default("formative")
   situation     String
   globalComment String?
+  createdAt     DateTime           @default(now())
   isValidated   Boolean            @default(false)
   validatedAt   DateTime?
-  createdAt     DateTime           @default(now())
   evaluator     Teacher            @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
   session       EvaluationSession? @relation(fields: [sessionId], references: [id])
   student       Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)

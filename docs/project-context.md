@@ -44,8 +44,8 @@
 | 2 | Auth JWT, API Routes de base, logique IA | ✅ Terminé |
 | 3 | Grilles E4/E6 (schéma + seeder) | ✅ Terminé |
 | 4 | Design Stitch (4 écrans) + intégration HTML | ✅ Terminé |
-| 5 | Migration générateur pédagogique (profvirtuel → Next.js) | ⬜ À faire |
-| 6 | Migration chatbot tuteur IA | ⬜ À faire |
-| 7 | Middleware JWT (protection des routes) | ⬜ À faire |
-| 8 | Base de données PostgreSQL + migration + seed | ⬜ À faire |
+| 5 | Générateur pédagogique IA (10 types, export PDF/DOCX/GIFT/Wooclap, bibliothèque) | ✅ Terminé |
+| 6 | Chatbot Tuteur IA (streaming SSE, historique sessions, RAG formateur) | ✅ Terminé |
+| 7 | Middleware JWT (protection des routes) | ✅ Terminé |
+| 8 | Base de données PostgreSQL + migration baseline + seed Railway | ✅ Terminé |
 | 9 | Tests + déploiement (Railway ou Vercel) | ⬜ À faire |

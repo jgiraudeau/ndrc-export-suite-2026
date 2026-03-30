@@ -10,8 +10,7 @@ out/
 .env.local
 .env.production.local
 
-# Prisma generated
-prisma/migrations/
+# Prisma generated (migrations committées pour le déploiement)
 
 # OS
 .DS_Store

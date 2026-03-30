@@ -33,17 +33,14 @@ async function resetAndSeed() {
 
   // 2. Importation des Référentiels E4 et E6
   const blocks = ['e4', 'e6']
-  
   for (const block of blocks) {
     const filePath = path.join(__dirname, `referentiel_${block}.json`)
     if (fs.existsSync(filePath)) {
       const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-      
       for (const domain of data) {
         for (let i = 0; i < domain.children.length; i++) {
           const skill = domain.children[i]
           const code = `${domain.code}_${i + 1}`
-          
           const competency = await prisma.competency.upsert({
             where: { code },
             update: { description: skill.description, block: block.toUpperCase() },
@@ -62,9 +59,25 @@ async function resetAndSeed() {
           console.log(`✅ Compétence chargée : ${competency.code}`)
         }
       }
-    } else {
-      console.warn(`⚠️ Fichier introuvable : ${filePath}`)
     }
+  }
+
+  // 3. Importation des Compétences Digitales (E5B)
+  const { DIGITAL_COMPETENCIES } = require("../src/data/digital-competencies")
+  for (const skill of DIGITAL_COMPETENCIES) {
+    await prisma.competency.upsert({
+      where: { code: skill.id },
+      update: { description: skill.label, block: "E5B" },
+      create: {
+        code: skill.id,
+        description: skill.label,
+        block: "E5B",
+        criteria: {
+          create: [{ description: `Validation de la compétence technique : ${skill.label}`, weight: 1.0 }]
+        }
+      }
+    })
+    console.log(`✅ Compétence E5B chargée : ${skill.id}`)
   }
 
   console.log("🌱 Seeding terminé avec succès !")

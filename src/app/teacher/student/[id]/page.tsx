@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
     ArrowLeft, CheckCircle2, BookOpen, Save, ExternalLink,
@@ -32,21 +32,24 @@ type EvalFilter = "ALL" | "TO_EVALUATE" | "VALIDATED" | "REJECTED";
 export default function StudentDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const studentId = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
     const [student, setStudent] = useState<StudentWithProgress | null>(null);
     const [experiences, setExperiences] = useState<ProfessionalExperience[]>([]);
     const [loading, setLoading] = useState(true);
     
-    // Initialiser l'onglet depuis l'URL si présent
-    const [activeTab, setActiveTab] = useState<"DIGITAL" | "E4" | "E6">(() => {
-        if (typeof window !== "undefined") {
-            const params = new URLSearchParams(window.location.search);
-            const tab = params.get("tab");
-            if (tab === "E4" || tab === "E6") return tab;
+    const [activeTab, setActiveTab] = useState<"DIGITAL" | "E4" | "E6">("DIGITAL");
+
+    // Surveiller les changements d'onglets via URL
+    useEffect(() => {
+        const tab = searchParams.get("tab");
+        if (tab === "E4" || tab === "E6") {
+            setActiveTab(tab);
+        } else if (tab === "DIGITAL") {
+            setActiveTab("DIGITAL");
         }
-        return "DIGITAL";
-    });
+    }, [searchParams]);
 
     // Filtres
     const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("ALL");
@@ -128,7 +131,12 @@ export default function StudentDetailPage() {
         if (format === "pdf") {
             PDFService.generateEvaluationGrid(student, evaluation, type);
         } else {
-            DOCXService.generateEvaluationGrid(student, evaluation, type);
+            const referential = type === "E4" ? E4_DATA : E6_DATA;
+            const grades: Record<string, number> = {};
+            student.competencies.forEach(c => {
+                grades[c.competencyId] = c.teacherStatus || 0;
+            });
+            DOCXService.generateEvaluationGrid(student, evaluation, type, referential, grades);
         }
     };
 
@@ -367,19 +375,28 @@ export default function StudentDetailPage() {
                 {/* Tabs Selection */}
                 <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
                     <button
-                        onClick={() => setActiveTab("DIGITAL")}
+                        onClick={() => {
+                            setActiveTab("DIGITAL");
+                            router.replace(`/teacher/student/${studentId}?tab=DIGITAL`);
+                        }}
                         className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "DIGITAL" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
                     >
                         Compétences Digitales
                     </button>
                     <button
-                        onClick={() => setActiveTab("E4")}
+                        onClick={() => {
+                            setActiveTab("E4");
+                            router.replace(`/teacher/student/${studentId}?tab=E4`);
+                        }}
                         className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "E4" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
                     >
                         Épreuve E4
                     </button>
                     <button
-                        onClick={() => setActiveTab("E6")}
+                        onClick={() => {
+                            setActiveTab("E6");
+                            router.replace(`/teacher/student/${studentId}?tab=E6`);
+                        }}
                         className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "E6" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
                     >
                         Épreuve E6
