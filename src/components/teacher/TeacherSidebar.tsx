@@ -9,7 +9,10 @@ import {
   GraduationCap,
   LogOut,
   Sparkles,
-  Library
+  Library,
+  Globe,
+  Briefcase,
+  Bot
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -29,6 +32,9 @@ export function TeacherSidebar() {
     { href: "/teacher/students", label: "Mes Étudiants", icon: Users },
     { href: "/teacher/evaluations/e4", label: "Grilles E4", icon: ClipboardCheck },
     { href: "/teacher/evaluations/e6", label: "Grilles E6", icon: BarChart3 },
+    { href: "/teacher/missions", label: "Missions E5B", icon: Globe },
+    { href: "/teacher/portfolio", label: "Passeport Pro", icon: Briefcase },
+    { href: "/teacher/suivi-ia", label: "Suivi IA", icon: Bot },
     { href: "/teacher/generate", label: "Générateur IA", icon: Sparkles },
     { href: "/teacher/library", label: "Mes Documents", icon: Library },
     { href: "/teacher/settings", label: "Paramètres", icon: Settings },
