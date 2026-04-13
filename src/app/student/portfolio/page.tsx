@@ -55,7 +55,23 @@ export default function StudentPortfolioPage() {
   };
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+    const loadInitialData = async () => {
+      const { data: dash } = await apiStudentDashboard();
+      if (!dash || cancelled) {
+        setLoading(false);
+        return;
+      }
+
+      setStudentData(dash);
+      const { data: exps } = await apiGetExperiences({ studentId: dash.id });
+      if (cancelled) return;
+      if (exps) setExperiences(exps);
+      setLoading(false);
+    };
+
+    void loadInitialData();
+    return () => { cancelled = true; };
   }, []);
 
   const getStatusColor = (status: string) => {
@@ -116,7 +132,7 @@ export default function StudentPortfolioPage() {
                 <ShieldCheck size={32} />
               </div>
               <div>
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Niveau d'Excellence</div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Niveau d&apos;Excellence</div>
                 <div className="text-2xl font-black text-slate-900 tracking-tight">
                   {calculateBadge(studentData.progress.acquiredCount, studentData.progress.totalCount).label}
                 </div>
@@ -130,7 +146,7 @@ export default function StudentPortfolioPage() {
           
           <div className="bg-slate-900 p-8 rounded-[32px] text-white flex flex-col justify-center">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Certification</div>
-            <p className="text-xs font-bold leading-relaxed mb-4 text-slate-300">Validez votre passeport pour le présenter à l'examen officiel.</p>
+            <p className="text-xs font-bold leading-relaxed mb-4 text-slate-300">Validez votre passeport pour le présenter à l&apos;examen officiel.</p>
             <button 
               onClick={handleDownloadPDF}
               className="w-full py-3 bg-white text-slate-900 rounded-xl font-black text-xs hover:bg-slate-100 transition-all flex items-center justify-center gap-2"

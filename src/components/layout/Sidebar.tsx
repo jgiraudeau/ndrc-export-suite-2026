@@ -11,7 +11,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Settings,
   Briefcase,
   MessageSquare
 } from "lucide-react";

@@ -7,10 +7,40 @@ import { MarkdownParser } from "./markdown-parser";
 
 // Extend jsPDF type for autotable
 interface jsPDFWithAutoTable extends jsPDF {
-  lastAutoTable: {
+  lastAutoTable?: {
     finalY: number;
   };
 }
+
+type StudentIdentity = {
+  firstName: string;
+  lastName: string;
+  classCode?: string | null;
+};
+
+type JournalLog = {
+  date: string;
+  content: string;
+  isValidated: boolean;
+};
+
+type AISupportMetadata = {
+  title: string;
+  filename?: string;
+};
+
+type EvaluationScore = {
+  criterionId: string;
+  criterionDescription?: string;
+  comment?: string | null;
+  score: number;
+};
+
+type EvaluationGridData = {
+  sessionName?: string;
+  centerName?: string;
+  scores?: EvaluationScore[];
+};
 
 // Helper to get competency label from ID
 const getCompetencyLabel = (id: string) => {
@@ -43,7 +73,7 @@ const drawBranding = (doc: jsPDF, title: string, subtitle: string) => {
 };
 
 const drawFooter = (doc: jsPDF) => {
-    const pageCount = (doc as any).internal.getNumberOfPages();
+    const pageCount = doc.getNumberOfPages();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     
@@ -61,6 +91,9 @@ const drawFooter = (doc: jsPDF) => {
     }
 };
 
+const getLastAutoTableFinalY = (doc: jsPDFWithAutoTable, fallback = 60) =>
+  doc.lastAutoTable?.finalY ?? fallback;
+
 /**
  * Service pour la génération de documents PDF officiels de haute qualité
  */
@@ -69,7 +102,7 @@ export const PDFService = {
   /**
    * Génère le Passeport de Professionnalisation
    */
-  generateProPassport: (student: any, experiences: ProfessionalExperience[]) => {
+  generateProPassport: (student: StudentIdentity, experiences: ProfessionalExperience[]) => {
     const doc = new jsPDF() as jsPDFWithAutoTable;
     const pageWidth = doc.internal.pageSize.getWidth();
     
@@ -129,7 +162,7 @@ export const PDFService = {
           },
           margin: { left: 20, right: 20 },
         });
-        y = (doc as any).lastAutoTable.finalY + 10;
+        y = getLastAutoTableFinalY(doc, y + 5) + 10;
       });
     }
 
@@ -140,9 +173,8 @@ export const PDFService = {
   /**
    * Génère le Journal de Bord complet
    */
-  generateJournal: (student: any, logs: any[]) => {
+  generateJournal: (student: StudentIdentity, logs: JournalLog[]) => {
     const doc = new jsPDF() as jsPDFWithAutoTable;
-    const pageWidth = doc.internal.pageSize.getWidth();
     
     drawBranding(doc, "Journal de Bord", "Fil d'actualité des actions et compétences");
 
@@ -186,7 +218,7 @@ export const PDFService = {
    * Génère un support pédagogique général (Dossier Prof, Étudiant, Planning, etc.)
    * Gère les tableaux Markdown et le mode paysage.
    */
-  generateAISupport: (metadata: any, content: string, track: string, options?: { orientation?: "portrait" | "landscape" }) => {
+  generateAISupport: (metadata: AISupportMetadata, content: string, track: string, options?: { orientation?: "portrait" | "landscape" }) => {
       const doc = new jsPDF({ 
           orientation: options?.orientation || "portrait",
           unit: "mm",
@@ -274,7 +306,7 @@ export const PDFService = {
               }
           });
           
-          y = (doc as any).lastAutoTable.finalY + 15;
+          y = getLastAutoTableFinalY(doc, y + 5) + 15;
       }
 
       // Visa Formateur
@@ -293,7 +325,7 @@ export const PDFService = {
   /**
    * Génère une grille d'évaluation (E4 ou E6)
    */
-  generateEvaluationGrid: (student: any, evaluation: any, type: "E4" | "E6") => {
+  generateEvaluationGrid: (student: StudentIdentity, evaluation: EvaluationGridData, type: "E4" | "E6") => {
     const doc = new jsPDF({ orientation: "landscape" }) as jsPDFWithAutoTable;
     const pageWidth = doc.internal.pageSize.getWidth();
     
@@ -314,13 +346,13 @@ export const PDFService = {
       margin: { left: 20 }
     });
 
-    y = (doc as any).lastAutoTable.finalY + 10;
+    y = getLastAutoTableFinalY(doc, y) + 10;
 
     if (evaluation.scores && evaluation.scores.length > 0) {
         autoTable(doc, {
           startY: y,
           head: [['COMPÉTENCE ÉVALUÉE', 'APPRÉCIATION DU FORMATEUR', 'NOTE']],
-          body: evaluation.scores.map((s: any) => [
+          body: evaluation.scores.map((s: EvaluationScore) => [
             s.criterionDescription || s.criterionId,
             s.comment || "-",
             `${s.score} / 4`
@@ -335,7 +367,7 @@ export const PDFService = {
           },
           margin: { left: 20, right: 20 }
         });
-        y = (doc as any).lastAutoTable.finalY + 15;
+        y = getLastAutoTableFinalY(doc, y) + 15;
     }
 
     // Signature Area

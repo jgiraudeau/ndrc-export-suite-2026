@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { generateTextStream } from '@/lib/ai/gemini';
+import { ensureGlobalFileSearchStore } from '@/lib/ai/file-search';
 import { prisma } from '@/lib/prisma';
 import { verifyToken, extractToken } from '@/lib/jwt';
 
@@ -16,7 +17,7 @@ RÈGLES :
 
 const ChatSchema = z.object({
   message: z.string().min(1, 'Le message est requis'),
-  sessionId: z.string().optional(),
+  sessionId: z.string().nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
   let body: z.infer<typeof ChatSchema>;
   try {
     body = ChatSchema.parse(await req.json());
-  } catch (err) {
+  } catch {
     return new Response(JSON.stringify({ error: 'Données invalides' }), { status: 400 });
   }
   const { message, sessionId: providedSessionId } = body;
@@ -62,25 +63,12 @@ export async function POST(req: NextRequest) {
     take: 20,
   });
 
-  // 3. RAG — contexte formateur (3 derniers docs sauvegardés)
-  const student = await prisma.student.findUnique({
-    where: { id: studentId },
-    select: { teacherId: true },
-  });
-
-  let contextDocs = '';
-  if (student?.teacherId) {
-    const docs = await prisma.savedDocument.findMany({
-      where: { teacherId: student.teacherId },
-      orderBy: { createdAt: 'desc' },
-      take: 3,
-      select: { title: true, content: true },
-    });
-    if (docs.length > 0) {
-      contextDocs =
-        '\n\nCONTEXTE PÉDAGOGIQUE (Cours de ton formateur — priorité maximale) :\n' +
-        docs.map((d) => `--- ${d.title} ---\n${d.content}`).join('\n\n');
-    }
+  // 3. RAG global (piloté par l'admin)
+  let ragStoreName: string | null = null;
+  try {
+    ragStoreName = await ensureGlobalFileSearchStore();
+  } catch (err) {
+    console.error('[chat][file-search] Unable to resolve global store:', err);
   }
 
   // 4. Construire l'historique au format Gemini
@@ -91,7 +79,7 @@ export async function POST(req: NextRequest) {
   // Ajouter le message courant
   geminiHistory.push({ role: 'user', parts: [{ text: message }] });
 
-  const systemPrompt = SYSTEM_TUTOR + contextDocs;
+  const systemPrompt = SYSTEM_TUTOR;
 
   // 5. Sauvegarder le message utilisateur
   await prisma.chatMessage.create({
@@ -110,7 +98,9 @@ export async function POST(req: NextRequest) {
 
       let fullContent = '';
       try {
-        for await (const chunk of generateTextStream(systemPrompt, geminiHistory)) {
+        for await (const chunk of generateTextStream(systemPrompt, geminiHistory, {
+          fileSearchStoreNames: ragStoreName ? [ragStoreName] : undefined,
+        })) {
           fullContent += chunk;
           controller.enqueue(
             encoder.encode('data: ' + JSON.stringify({ chunk }) + '\n\n')

@@ -32,7 +32,7 @@ interface TeacherStore {
 
 export const useTeacherStore = create<TeacherStore>()(
     persist(
-        (set, get) => ({
+        (set) => ({
             classes: [
                 { id: 'NDRC1', name: 'BTS NDRC 1', studentCount: 0, averageProgress: 0 },
                 { id: 'NDRC2', name: 'BTS NDRC 2', studentCount: 0, averageProgress: 0 },

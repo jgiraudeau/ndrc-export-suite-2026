@@ -11,14 +11,13 @@ import {
     Download,
     CheckCircle2,
     Loader2,
-    User
 } from "lucide-react";
 import Link from "next/link";
-import { TeacherLayout } from "@/components/layout/TeacherLayout"; // Reuse layout if possible or minimal container
-// Wait, students don't use TeacherLayout. I'll use a simple container.
+import { cn } from "@/lib/utils";
+import type { StudentDashboardData } from "@/lib/api-client";
 
 export default function StudentProfilePage() {
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<StudentDashboardData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -32,9 +31,9 @@ export default function StudentProfilePage() {
             const res = await fetch("/api/student/dashboard", {
                 headers: { "Authorization": `Bearer ${token}` }
             });
-            const json = await res.json();
+            const json = await res.json() as { success: boolean; data?: StudentDashboardData };
             if (json.success) {
-                setData(json.data);
+                setData(json.data ?? null);
             }
         } catch (err) {
             console.error("Failed to fetch profile:", err);
@@ -137,7 +136,7 @@ export default function StudentProfilePage() {
                             </h2>
 
                             <div className="space-y-6">
-                                {data.recentActivity.slice(0,3).map((activity: any) => (
+                                {data.recentActivity.slice(0,3).map((activity) => (
                                     <div key={activity.id} className="group flex gap-4">
                                         <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors flex-shrink-0">
                                             <Briefcase size={20} />
@@ -188,8 +187,4 @@ function SkillProgress({ label, value, color }: { label: string, value: number, 
             </div>
         </div>
     );
-}
-
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(" ");
 }

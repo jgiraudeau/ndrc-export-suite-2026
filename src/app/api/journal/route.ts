@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
         const assignmentId = searchParams.get("assignmentId");
         const studentId = searchParams.get("studentId"); // For teacher view
 
-        let whereClause: any = {};
+        let whereClause: Prisma.JournalEntryWhereInput = {};
         if (experienceId) whereClause.experienceId = experienceId;
         else if (assignmentId) whereClause.assignmentId = assignmentId;
         else if (studentId && auth.payload.role === "TEACHER") {
@@ -56,7 +57,27 @@ export async function POST(request: NextRequest) {
     if ("status" in auth) return auth;
 
     try {
-        const { content, proofs, links, experienceId, assignmentId, date } = await request.json();
+        const body = (await request.json()) as {
+            content?: unknown;
+            proofs?: unknown;
+            links?: unknown;
+            experienceId?: unknown;
+            assignmentId?: unknown;
+            date?: unknown;
+        };
+        const content = typeof body.content === "string" ? body.content.trim() : "";
+        const proofs =
+            Array.isArray(body.proofs) && body.proofs.every((p) => typeof p === "string")
+                ? body.proofs
+                : [];
+        const links =
+            Array.isArray(body.links) && body.links.every((l) => typeof l === "string")
+                ? body.links
+                : [];
+        const experienceId = typeof body.experienceId === "string" ? body.experienceId : null;
+        const assignmentId = typeof body.assignmentId === "string" ? body.assignmentId : null;
+        const parsedDate = body.date !== undefined ? new Date(String(body.date)) : new Date();
+        const date = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
 
         if (!content) {
             return apiError("Content is required", 400);
@@ -69,11 +90,11 @@ export async function POST(request: NextRequest) {
         const entry = await prisma.journalEntry.create({
             data: {
                 content,
-                proofs: proofs || [],
-                links: links || [],
+                proofs,
+                links,
                 experienceId,
                 assignmentId,
-                date: date ? new Date(date) : new Date(),
+                date,
             },
         });
 
@@ -90,18 +111,40 @@ export async function PATCH(request: NextRequest) {
     if ("status" in auth) return auth;
 
     try {
-        const { id, teacherComment, isValidated } = await request.json();
+        const body = (await request.json()) as {
+            id?: unknown;
+            teacherComment?: unknown;
+            isValidated?: unknown;
+        };
+        const id = typeof body.id === "string" ? body.id : "";
+        const teacherComment =
+            body.teacherComment === undefined
+                ? undefined
+                : typeof body.teacherComment === "string"
+                  ? body.teacherComment
+                  : null;
+        const isValidated =
+            body.isValidated === undefined
+                ? undefined
+                : typeof body.isValidated === "boolean"
+                  ? body.isValidated
+                  : undefined;
 
         if (!id) {
             return apiError("ID is required", 400);
         }
 
+        const updateData: Prisma.JournalEntryUpdateInput = {};
+        if (teacherComment !== undefined) updateData.teacherComment = teacherComment;
+        if (isValidated !== undefined) updateData.isValidated = isValidated;
+
+        if (Object.keys(updateData).length === 0) {
+            return apiError("Aucune donnée à mettre à jour", 400);
+        }
+
         const entry = await prisma.journalEntry.update({
             where: { id },
-            data: {
-                ...(teacherComment !== undefined ? { teacherComment } : {}),
-                ...(isValidated !== undefined ? { isValidated } : {}),
-            },
+            data: updateData,
             include: {
                 assignment: true,
                 experience: true

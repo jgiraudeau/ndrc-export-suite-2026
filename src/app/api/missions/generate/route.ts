@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 import { ALL_COMPETENCIES } from "@/data/competencies";
-import { GoogleGenAI } from "@google/genai";
+import type { Part } from "@google/genai";
+import { genAI } from "@/lib/ai/gemini";
+import { ensureGlobalFileSearchStore } from "@/lib/ai/file-search";
 import fs from "fs";
 import path from "path";
 
@@ -15,12 +17,6 @@ export async function POST(request: NextRequest) {
         if (!competencyIds || !Array.isArray(competencyIds) || competencyIds.length === 0) {
             return apiError("Il faut fournir au moins un ID de compétence.");
         }
-
-        if (!process.env.GEMINI_API_KEY) {
-            return apiError("La clé d'API Gemini n'est pas configurée côté serveur.", 500);
-        }
-
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         // Lookup competency details
         const compsToPractice = competencyIds
@@ -36,7 +32,7 @@ export async function POST(request: NextRequest) {
 
         const compListText = validComps.map(c => `- ${c.label} (${c.platform})`).join('\n');
 
-        const platform = validComps.length > 0 ? validComps[0].platform : "AGNOSTIC"; // Determine primary platform context
+        const platform = (validComps.length > 0 ? validComps[0].platform : "AGNOSTIC") || "AGNOSTIC"; // Determine primary platform context
         const contextStr = context || (platform === "WORDPRESS" ? "un site vitrine ou blog type WordPress" : "une boutique e-commerce Prestashop");
 
         let levelInstructions = "";
@@ -125,7 +121,7 @@ Génère uniquement le contenu de cet email.
         }
 
         // 2. Préparer les parties (parts) du message pour l'API Gemini
-        const parts: any[] = [];
+        const parts: Part[] = [];
 
         if (coursePdfs.length > 0) {
             parts.push({ text: "Voici les fiches de cours officielles (Knowledge Base) : " });
@@ -146,18 +142,45 @@ Génère uniquement le contenu de cet email.
 
         parts.push({ text: prompt });
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
+        // 3. Préparer le RAG global (piloté par l'admin)
+        let ragStoreName: string | null = null;
+        try {
+            ragStoreName = await ensureGlobalFileSearchStore();
+        } catch (err) {
+            console.error("[missions/generate][file-search] Unable to resolve global RAG store:", err);
+        }
+
+        const config: {
+            temperature: number;
+            tools?: Array<{ fileSearch: { fileSearchStoreNames: string[] } }>;
+        } = {
+            temperature: 0.7,
+        };
+
+        if (ragStoreName) {
+            config.tools = [
+                {
+                    fileSearch: {
+                        fileSearchStoreNames: [ragStoreName],
+                    },
+                },
+            ];
+        }
+
+        const response = await genAI.models.generateContent({
+            model: "gemini-2.5-flash",
             contents: parts,
-            config: {
-                temperature: 0.7,
-            },
+            config,
         });
 
         return apiSuccess({ mission: response.text });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Gemini Generate Error:", error);
-        return apiError(error.message || "Erreur lors de la génération de la mission", 500);
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Erreur lors de la génération de la mission";
+        return apiError(message, 500);
     }
 }

@@ -6,7 +6,6 @@ import {
     Users, 
     Calendar, 
     CheckCircle2, 
-    Search, 
     ChevronRight, 
     MessageSquare,
     CheckSquare,
@@ -35,8 +34,8 @@ interface StudentAssignment {
     assignedAt: string;
     student: {
         id: string;
-        firstName: true;
-        lastName: true;
+        firstName: string;
+        lastName: string;
         class: { name: string };
     };
     journal: JournalEntry[];
@@ -59,25 +58,25 @@ export default function TeacherMissionDetailPage() {
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        fetchMission();
-    }, [id]);
-
-    async function fetchMission() {
-        try {
-            const token = localStorage.getItem("ndrc_token");
-            const res = await fetch(`/api/teacher/missions/${id}`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                setMission(data.data);
+        async function fetchMission() {
+            try {
+                const token = localStorage.getItem("ndrc_token");
+                const res = await fetch(`/api/teacher/missions/${id}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setMission(data.data);
+                }
+            } catch (err) {
+                console.error("Failed to fetch mission details:", err);
+            } finally {
+                setLoading(false);
             }
-        } catch (err) {
-            console.error("Failed to fetch mission details:", err);
-        } finally {
-            setLoading(false);
         }
-    }
+
+        void fetchMission();
+    }, [id]);
 
     async function updateJournalEntry(entryId: string, isValidated: boolean) {
         setIsSaving(true);
@@ -228,7 +227,7 @@ export default function TeacherMissionDetailPage() {
                                                     </div>
 
                                                     <p className="text-sm font-medium text-slate-700 leading-relaxed italic border-l-4 border-slate-200 pl-4">
-                                                        "{log.content}"
+                                                        &ldquo;{log.content}&rdquo;
                                                     </p>
 
                                                     {log.links && log.links.length > 0 && (
@@ -265,7 +264,7 @@ export default function TeacherMissionDetailPage() {
                                                                 disabled={isSaving}
                                                                 className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
                                                             >
-                                                                <CheckSquare size={16} /> Valider l'action
+                                                                <CheckSquare size={16} /> Valider l&apos;action
                                                             </button>
                                                             <button 
                                                                 onClick={() => updateJournalEntry(log.id, false)}
@@ -282,7 +281,7 @@ export default function TeacherMissionDetailPage() {
                                         ))
                                     ) : (
                                         <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                                            <p className="text-slate-400 font-bold text-sm">Cet étudiant n'a pas encore saisi d'actions.</p>
+                                            <p className="text-slate-400 font-bold text-sm">Cet étudiant n&apos;a pas encore saisi d&apos;actions.</p>
                                         </div>
                                     )}
                                 </div>

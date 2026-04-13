@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     });
 
     return apiSuccess(
-        progress.map((p: any) => ({
+        progress.map((p) => ({
             competencyId: p.competencyId,
             acquired: p.acquired,
             status: p.status,

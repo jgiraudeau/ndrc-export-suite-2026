@@ -3,40 +3,84 @@ import { generateText } from "@/lib/ai/gemini";
 import { QUIZ_EXPORT_PROMPTS } from "@/lib/ai/prompts";
 import * as XLSX from "xlsx";
 
+type QuizFormat = keyof typeof QUIZ_EXPORT_PROMPTS;
+
+type WooclapQuestion = {
+    title: string;
+    answers: string[];
+    correct?: number[];
+};
+
+type WooclapPayload = {
+    questions: WooclapQuestion[];
+};
+
+function isWooclapPayload(value: unknown): value is WooclapPayload {
+    if (typeof value !== "object" || value === null) return false;
+    if (!("questions" in value)) return false;
+    if (!Array.isArray((value as { questions: unknown }).questions)) return false;
+
+    return (value as { questions: unknown[] }).questions.every((q) => {
+        if (typeof q !== "object" || q === null) return false;
+        const candidate = q as { title?: unknown; answers?: unknown; correct?: unknown };
+        return (
+            typeof candidate.title === "string" &&
+            Array.isArray(candidate.answers) &&
+            candidate.answers.every((a) => typeof a === "string") &&
+            (candidate.correct === undefined ||
+                (Array.isArray(candidate.correct) &&
+                    candidate.correct.every((i) => typeof i === "number")))
+        );
+    });
+}
+
 export async function POST(req: NextRequest) {
     try {
-        const { content, format } = await req.json();
+        const body = (await req.json()) as { content?: unknown; format?: unknown };
+        const content = typeof body.content === "string" ? body.content : "";
+        const format = typeof body.format === "string" ? body.format : "";
 
         if (!content || !format) {
             return NextResponse.json({ error: "Missing content or format" }, { status: 400 });
         }
 
-        const prompt = (QUIZ_EXPORT_PROMPTS as any)[format];
+        if (!(format in QUIZ_EXPORT_PROMPTS)) {
+            return NextResponse.json({ error: "Invalid format" }, { status: 400 });
+        }
+        const formatKey = format as QuizFormat;
+        const prompt = QUIZ_EXPORT_PROMPTS[formatKey];
         if (!prompt) {
             return NextResponse.json({ error: "Invalid format" }, { status: 400 });
         }
 
         const transformed = await generateText(prompt, content);
 
-        if (format === "wooclap") {
+        if (formatKey === "wooclap") {
             try {
                 // Parse AI JSON response
                 // Gemini sometimes wraps code in ```json ... ```
                 const jsonStr = transformed.replace(/```json|```/g, "").trim();
-                const data = JSON.parse(jsonStr);
+                const parsed = JSON.parse(jsonStr) as unknown;
+                if (!isWooclapPayload(parsed)) {
+                    throw new Error("Invalid Wooclap payload structure");
+                }
                 
                 // Create Wooclap Excel format
-                const wsData = [
+                const wsData: Array<Array<string | number>> = [
                     ["Question", "Type", "Proposition 1", "Proposition 2", "Proposition 3", "Proposition 4", "Correcte(s)"]
                 ];
 
-                data.questions.forEach((q: any) => {
+                parsed.questions.forEach((q) => {
+                    const answers = q.answers.slice(0, 4);
+                    const paddedAnswers = [
+                        ...answers,
+                        ...Array(Math.max(0, 4 - answers.length)).fill(""),
+                    ];
                     const row = [
                         q.title,
                         "QCM",
-                        ...(q.answers.slice(0, 4)),
-                        ...Array(Math.max(0, 4 - q.answers.length)).fill(""),
-                        (q.correct || [0]).map((i: number) => i + 1).join(",")
+                        ...paddedAnswers,
+                        (q.correct || [0]).map((i) => i + 1).join(",")
                     ];
                     wsData.push(row);
                 });
@@ -60,8 +104,8 @@ export async function POST(req: NextRequest) {
         }
 
         // For GIFT and Google (CSV), return plain text
-        const contentType = format === "google" ? "text/csv" : "text/plain";
-        const extension = format === "google" ? "csv" : "txt";
+        const contentType = formatKey === "google" ? "text/csv" : "text/plain";
+        const extension = formatKey === "google" ? "csv" : "txt";
 
         return new NextResponse(transformed, {
             headers: {
@@ -70,8 +114,9 @@ export async function POST(req: NextRequest) {
             },
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Quiz export error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : "Quiz export failed";
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

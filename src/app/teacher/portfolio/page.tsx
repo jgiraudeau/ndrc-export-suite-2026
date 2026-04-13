@@ -3,20 +3,16 @@
 import { useState, useEffect } from "react";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
 import { 
-  Briefcase, 
   Search, 
-  Filter, 
   ChevronRight, 
   Plus, 
   Calendar, 
   User, 
   CheckCircle2, 
   Clock,
-  ExternalLink,
-  MessageSquare,
   Loader2
 } from "lucide-react";
-import { apiGetExperiences, apiGetStudents, apiUpdateExperience, type ProfessionalExperience, type StudentWithProgress } from "@/lib/api-client";
+import { apiGetExperiences, apiGetStudents, apiUpdateExperience, type ProfessionalExperience } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { ExperienceMatrix } from "@/components/teacher/ExperienceMatrix";
 import { ExperienceModal } from "@/components/teacher/ExperienceModal";
@@ -49,7 +45,21 @@ export default function PortfolioPage() {
   };
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+    const syncData = async () => {
+      const { data: exps } = await apiGetExperiences({ classId: selectedClass !== "ALL" ? selectedClass : undefined });
+      const { data: students } = await apiGetStudents();
+      if (cancelled) return;
+
+      if (exps) setExperiences(exps);
+      if (students) {
+        setClasses(Array.from(new Set(students.map(s => s.classCode))));
+      }
+      setLoading(false);
+    };
+
+    void syncData();
+    return () => { cancelled = true; };
   }, [selectedClass]);
 
   const filtered = experiences.filter(exp => {
@@ -268,6 +278,12 @@ export default function PortfolioPage() {
             </div>
           </div>
         )}
+        <ExperienceModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={loadData}
+          experience={editingExp}
+        />
       </div>
     </TeacherLayout>
   );

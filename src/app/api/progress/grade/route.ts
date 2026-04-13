@@ -9,7 +9,10 @@ export async function PATCH(request: NextRequest) {
     const teacherId = auth.payload.sub;
 
     try {
-        const { studentId, competencyId, teacherStatus, teacherFeedback } = await request.json();
+        const { studentId, competencyId, teacherStatus, teacherFeedback, type = "FORMATIVE" } = await request.json();
+
+        // Si c'est du CCF, on utilise un suffixe pour l'étanchéité
+        const finalCompetencyId = type === "CCF" ? `${competencyId}_CCF` : competencyId;
 
         if (!studentId || !competencyId || typeof teacherStatus !== "number") {
             return apiError("studentId, competencyId et teacherStatus requis");
@@ -29,10 +32,10 @@ export async function PATCH(request: NextRequest) {
 
         // Upsert : crée un Progress si l'étudiant n'a pas encore auto-évalué
         const record = await prisma.progress.upsert({
-            where: { studentId_competencyId: { studentId, competencyId } },
+            where: { studentId_competencyId: { studentId, competencyId: finalCompetencyId } },
             create: {
                 studentId,
-                competencyId,
+                competencyId: finalCompetencyId,
                 acquired: false,
                 status: 0,
                 teacherStatus,

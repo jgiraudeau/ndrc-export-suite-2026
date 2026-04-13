@@ -1,43 +1,40 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
-import jwt from "jsonwebtoken";
+import { prisma } from "@/lib/prisma";
+import { extractToken, verifyToken } from "@/lib/jwt";
 
-const connectionString = `${process.env.DATABASE_URL}`;
-const pool = new pg.Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter } as any);
+async function resolveStudentId(req: Request): Promise<string | null> {
+  const token = extractToken(req);
+  if (!token) return null;
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
+  const payload = await verifyToken(token);
+  if (!payload || payload.role !== "STUDENT") return null;
+  return payload.sub;
+}
 
 export async function GET(req: Request) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) return NextResponse.json({ success: false, error: "Non authentifié" }, { status: 401 });
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-
-    if (!decoded.studentId) {
-      return NextResponse.json({ success: false, error: "Token invalide" }, { status: 401 });
+    const studentId = await resolveStudentId(req);
+    if (!studentId) {
+      return NextResponse.json({ success: false, error: "Non authentifié" }, { status: 401 });
     }
 
     const student = await prisma.student.findUnique({
-      where: { id: decoded.studentId },
+      where: { id: studentId },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         identifier: true,
         classId: true,
+        wpUrl: true,
+        prestaUrl: true,
         class: {
           select: {
             code: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
     if (!student) {
@@ -49,14 +46,47 @@ export async function GET(req: Request) {
       student: {
         ...student,
         name: `${student.firstName} ${student.lastName}`,
-        classCode: student.class?.code || "NDRC"
-      }
+        classCode: student.class?.code || "NDRC",
+      },
     });
-
   } catch (error) {
     console.error("Profile API error:", error);
     return NextResponse.json({ success: false, error: "Erreur serveur" }, { status: 500 });
-  } finally {
-    // Note: In Next.js App Router with long-lived pools, we don't necessarily close it every time.
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const studentId = await resolveStudentId(req);
+    if (!studentId) {
+      return NextResponse.json({ success: false, error: "Non authentifié" }, { status: 401 });
+    }
+
+    const body = (await req.json()) as { wpUrl?: unknown; prestaUrl?: unknown };
+    const data: { wpUrl?: string | null; prestaUrl?: string | null } = {};
+
+    if (body.wpUrl !== undefined) {
+      data.wpUrl = typeof body.wpUrl === "string" ? body.wpUrl.trim() : null;
+    }
+    if (body.prestaUrl !== undefined) {
+      data.prestaUrl = typeof body.prestaUrl === "string" ? body.prestaUrl.trim() : null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ success: false, error: "Aucune donnée à mettre à jour" }, { status: 400 });
+    }
+
+    const updated = await prisma.student.update({
+      where: { id: studentId },
+      data,
+    });
+
+    return NextResponse.json({
+      success: true,
+      student: updated,
+    });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    return NextResponse.json({ success: false, error: "Erreur lors de la mise à jour" }, { status: 500 });
   }
 }

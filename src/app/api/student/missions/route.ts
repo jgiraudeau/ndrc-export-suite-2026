@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
             orderBy: { assignedAt: "desc" },
         });
 
-        const result = (assignments as any[]).map(a => ({
+        const result = assignments.map((a) => ({
             id: a.id,
             missionId: a.mission.id,
             title: a.mission.title,
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
             status: a.status,
             assignedAt: a.assignedAt,
             completedAt: a.completedAt,
-            teacherName: a.teacher.name,
+            teacherName: a.teacher?.name || "Formateur",
             journal: a.journal,
         }));
 

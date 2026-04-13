@@ -22,12 +22,12 @@ export async function GET(request: NextRequest) {
             orderBy: [{ class: { code: "asc" } }, { lastName: "asc" }],
         });
 
-        const safeStudents = students.map((s: any) => {
-            const acquiredCount = s.progress.filter((p: any) => p.acquired).length;
+        const safeStudents = students.map((s) => {
+            const acquiredCount = s.progress.filter((p) => p.acquired).length;
 
             let lastActive = null;
             if (s.progress.length > 0) {
-                const sortedProgress = [...s.progress].sort((a: any, b: any) =>
+                const sortedProgress = [...s.progress].sort((a, b) =>
                     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
                 );
                 lastActive = sortedProgress[0].updatedAt.toISOString();
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
                 acquiredCount: acquiredCount,
                 progress: 0,
                 lastActive: lastActive,
-                competencies: s.progress.map((p: any) => ({
+                competencies: s.progress.map((p) => ({
                     competencyId: p.competencyId,
                     acquired: p.acquired,
                     status: p.status,
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
                     teacherFeedback: p.teacherFeedback,
                     teacherGradedAt: p.teacherGradedAt?.toISOString() ?? null,
                 })),
-                comments: s.comments.map((c: any) => ({
+                comments: s.comments.map((c) => ({
                     id: c.id,
                     text: c.text,
                     authorName: c.teacher?.name || "Professeur",
@@ -80,6 +80,13 @@ function normalizeStr(s: string): string {
         .trim();
 }
 
+function normalizeOptionalImportField(value: unknown): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
+
 async function generateUniqueIdentifier(firstName: string, lastName: string): Promise<string> {
     const base = `${normalizeStr(firstName)}.${normalizeStr(lastName)}`;
     let identifier = base;
@@ -100,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { students } = body; // Array of { firstName, lastName, classCode, password }
+        const { students } = body; // Array of { firstName, lastName, classCode, password, wpUrl?, prestaUrl? }
 
         if (!Array.isArray(students) || students.length === 0) {
             return apiError("Format invalide. Un tableau 'students' est attendu.", 400);
@@ -112,6 +119,8 @@ export async function POST(request: NextRequest) {
 
         for (const s of students) {
             if (!s.firstName || !s.lastName || !s.classCode || !s.password) continue;
+            const wpUrl = normalizeOptionalImportField(s.wpUrl);
+            const prestaUrl = normalizeOptionalImportField(s.prestaUrl);
 
             // 1. Upsert Class
             const classRecord = await prisma.class.upsert({
@@ -142,22 +151,43 @@ export async function POST(request: NextRequest) {
             });
 
             if (existingStudent) {
+                const dataToUpdate: {
+                    passwordHash: string;
+                    wpUrl?: string | null;
+                    prestaUrl?: string | null;
+                } = { passwordHash };
+                if (wpUrl !== undefined) dataToUpdate.wpUrl = wpUrl;
+                if (prestaUrl !== undefined) dataToUpdate.prestaUrl = prestaUrl;
+
                 await prisma.student.update({
                     where: { id: existingStudent.id },
-                    data: { passwordHash },
+                    data: dataToUpdate,
                 });
                 updatedCount++;
             } else {
                 const identifier = await generateUniqueIdentifier(s.firstName, s.lastName);
+                const dataToCreate: {
+                    firstName: string;
+                    lastName: string;
+                    identifier: string;
+                    passwordHash: string;
+                    classId: string;
+                    teacherId: string;
+                    wpUrl?: string | null;
+                    prestaUrl?: string | null;
+                } = {
+                    firstName: s.firstName,
+                    lastName: s.lastName,
+                    identifier,
+                    passwordHash,
+                    classId: classRecord.id,
+                    teacherId: auth.payload.sub,
+                };
+                if (wpUrl !== undefined) dataToCreate.wpUrl = wpUrl;
+                if (prestaUrl !== undefined) dataToCreate.prestaUrl = prestaUrl;
+
                 await prisma.student.create({
-                    data: {
-                        firstName: s.firstName,
-                        lastName: s.lastName,
-                        identifier,
-                        passwordHash,
-                        classId: classRecord.id,
-                        teacherId: auth.payload.sub,
-                    },
+                    data: dataToCreate,
                 });
                 createdCount++;
                 createdStudents.push({ firstName: s.firstName, lastName: s.lastName, identifier });

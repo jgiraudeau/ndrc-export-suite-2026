@@ -30,7 +30,7 @@ export async function apiFetch<T>(
             return { data: null, error: json.error || "Erreur inconnue" };
         }
         return { data: json as T, error: null };
-    } catch (err) {
+    } catch {
         return { data: null, error: "Erreur de connexion au serveur" };
     }
 }
@@ -111,14 +111,21 @@ export async function apiGetStudents() {
 }
 
 export async function apiUpdateStudent(id: string, data: { wpUrl?: string; prestaUrl?: string }) {
-    return apiFetch<{ message: string; student: any }>(
+    return apiFetch<{ message: string; student: StudentWithProgress }>(
         `/api/students/${id}`,
         { method: "PATCH", body: JSON.stringify(data) }
     );
 }
 
 export async function apiImportStudents(
-    students: Array<{ firstName: string; lastName: string; classCode: string; password: string }>
+    students: Array<{
+        firstName: string;
+        lastName: string;
+        classCode: string;
+        password: string;
+        wpUrl?: string;
+        prestaUrl?: string;
+    }>
 ) {
     return apiFetch<{
         message: string;

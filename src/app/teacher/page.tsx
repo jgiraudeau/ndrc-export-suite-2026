@@ -16,6 +16,13 @@ import {
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+type ActivityItem = {
+  type: string;
+  title: string;
+  date: string;
+  status: string;
+};
+
 export default function TeacherDashboard() {
   const [teacherName, setTeacherName] = useState("Formateur");
   const [loading, setLoading] = useState(true);
@@ -24,7 +31,7 @@ export default function TeacherDashboard() {
     classes: 0,
     avgProgress: 0,
     pendingEvals: 0,
-    activities: [] as any[]
+    activities: [] as ActivityItem[]
   });
 
   useEffect(() => {
@@ -64,7 +71,7 @@ export default function TeacherDashboard() {
               Bonjour, <span className="text-purple-600">{teacherName}</span> 👋
             </h1>
             <p className="text-slate-500 mt-2 font-medium">
-              Voici un aperçu de l'avancement de vos classes NDRC.
+              Voici un aperçu de l&apos;avancement de vos classes NDRC.
             </p>
           </div>
           <Link 

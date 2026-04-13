@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Lock, ChevronDown, ChevronUp, Trophy, MessageSquare } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Trophy, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ALL_COMPETENCIES } from "@/data/competencies";
@@ -41,7 +41,6 @@ const LEVELS = [
 
 export default function PlatformPage() {
     const params = useParams();
-    const router = useRouter();
     const { user } = useAuthStore();
     const [hydrated, setHydrated] = useState(false);
     const [serverProgress, setServerProgress] = useState<Record<string, { acquired: boolean; status: number; teacherStatus: number | null; teacherFeedback: string | null }>>({});
@@ -136,9 +135,10 @@ export default function PlatformPage() {
             const fileName = `Attestation_${config.name}_${(user?.name || "etudiant").replace(/\s+/g, '_')}.pdf`;
             doc.save(fileName);
             console.log("PDF téléchargé :", fileName);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Erreur PDF : ", err);
-            alert("Erreur JS lors de la génération PDF : " + (err.message || String(err)));
+            const message = err instanceof Error ? err.message : String(err);
+            alert("Erreur JS lors de la génération PDF : " + message);
         }
     };
 

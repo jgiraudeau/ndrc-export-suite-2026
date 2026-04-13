@@ -4,9 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
 import { EvaluationTable } from "@/components/teacher/EvaluationTable";
 import { apiGetStudents, type StudentWithProgress } from "@/lib/api-client";
-import E6_DATA from "../../../../../prisma/referentiel_e6.json";
+import { E6_COMPETENCIES } from "@/data/competencies";
 import { Loader2, GraduationCap } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+const TOTAL_E6 = E6_COMPETENCIES.length;
 
 export default function EvaluationsE6Page() {
   const [students, setStudents] = useState<StudentWithProgress[]>([]);
@@ -15,6 +17,7 @@ export default function EvaluationsE6Page() {
 
   const fetchStudents = useCallback(async () => {
     const { data, error } = await apiGetStudents();
+    
     if (!error && data) {
       setStudents(data);
     }
@@ -27,11 +30,11 @@ export default function EvaluationsE6Page() {
       router.push("/teacher/login");
       return;
     }
-    fetchStudents();
+    queueMicrotask(() => {
+      void fetchStudents();
+    });
   }, [fetchStudents, router]);
 
-  // Calcul du nombre total d'items dans E6
-  const totalE6Items = E6_DATA.reduce((acc, comp) => acc + (comp.children?.length || 0), 0);
 
   const studentsWithE6Progress = students.map(s => {
     const e6Comps = s.competencies.filter(c => c.competencyId.startsWith("E6."));
@@ -42,9 +45,9 @@ export default function EvaluationsE6Page() {
       firstName: s.firstName,
       lastName: s.lastName,
       classCode: s.classCode,
-      progress: totalE6Items > 0 ? Math.round((evaluatedCount / totalE6Items) * 100) : 0,
+      progress: TOTAL_E6 > 0 ? Math.round((evaluatedCount / TOTAL_E6) * 100) : 0,
       evaluatedCount,
-      totalCount: totalE6Items
+      totalCount: TOTAL_E6
     };
   });
 
@@ -57,12 +60,12 @@ export default function EvaluationsE6Page() {
               Suivi <span className="text-purple-600">Épreuve E6</span>
             </h1>
             <p className="text-slate-500 mt-2 font-medium">
-              Relation Client et Animation de Réseaux — Vue d'ensemble de la classe.
+              Relation Client et Animation de Réseaux — Vue d&apos;ensemble de la classe.
             </p>
           </div>
           <div className="flex items-center gap-2 px-6 py-3 bg-purple-50 text-purple-700 rounded-2xl font-black text-sm border border-purple-100 shadow-sm">
             <GraduationCap size={20} />
-            {totalE6Items} points de contrôle
+            {TOTAL_E6} points de contrôle
           </div>
         </div>
 

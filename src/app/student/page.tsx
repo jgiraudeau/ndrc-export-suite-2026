@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  User, CheckCircle2, Trophy, Clock, ChevronRight, Globe, ShoppingBag, MessageSquare, KeyRound, LogOut, FileText, File as FileIcon, BookOpen, Bell
+  CheckCircle2, Trophy, Clock, ChevronRight, Globe, MessageSquare, KeyRound, LogOut, FileText, BookOpen
 } from "lucide-react";
 import Link from "next/link";
 import { ExportUtils } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
 import { calculateBadge } from "@/lib/exports/badges";
 import { PDFExportService } from "@/lib/exports/student-export";
-import { apiStudentDashboard, apiChangePassword, apiLogout, apiGetExperiences, apiGetJournal, type StudentDashboardData } from "@/lib/api-client";
+import { apiStudentDashboard, apiChangePassword, apiGetExperiences, apiGetJournal, type StudentDashboardData } from "@/lib/api-client";
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -24,7 +24,15 @@ export default function StudentDashboard() {
   const [pwdMsg, setPwdMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [pwdLoading, setPwdLoading] = useState(false);
 
-  const [notifications, setNotifications] = useState<any[]>([]);
+  type NotificationItem = {
+    id: string;
+    isRead: boolean;
+    type: string;
+    title: string;
+    message: string;
+    createdAt: string;
+  };
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("ndrc_token");
@@ -349,7 +357,7 @@ export default function StudentDashboard() {
                         <div className="relative z-10 flex flex-col gap-6">
                             <div>
                                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Certification & Documents</h3>
-                                <p className="text-sm text-slate-400 font-bold mt-1">Générez vos dossiers officiels pour l'examen NDRC.</p>
+                                <p className="text-sm text-slate-400 font-bold mt-1">Générez vos dossiers officiels pour l&apos;examen NDRC.</p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -436,7 +444,7 @@ export default function StudentDashboard() {
                 <Trophy size={16} /> Objectifs
               </h3>
               <p className="text-sm text-indigo-700 mb-4 leading-relaxed">
-                Pour valider ton E5, assure-toi d'avoir au moins 80% de progression sur les deux plateformes.
+                Pour valider ton E5, assure-toi d&apos;avoir au moins 80% de progression sur les deux plateformes.
               </p>
               <Link href="/student/wordpress" className="block w-full bg-indigo-600 text-white font-bold text-center py-3 rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:scale-[1.02] transition-all text-sm">
                 Continuer ma progression

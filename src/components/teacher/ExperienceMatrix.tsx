@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TRANSVERSAL_REFERENTIAL, type TransversalBlock } from "@/data/transversal-referential";
+import { TRANSVERSAL_REFERENTIAL } from "@/data/transversal-referential";
 
 interface ExperienceMatrixProps {
   selectedIds: string[];

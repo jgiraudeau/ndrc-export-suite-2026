@@ -82,14 +82,14 @@ export const useProgressStore = create<ProgressStore>()(
                 const state = get();
                 // Filtrer les compétences de cette plateforme
                 const platformCompetencies = ALL_COMPETENCIES.filter(
-                    (c: any) => c.platform === platform.toUpperCase()
+                    (c) => c.platform === platform.toUpperCase()
                 );
 
                 if (platformCompetencies.length === 0) return 0;
 
                 // Compter celles qui sont 'true' dans le store
                 const acquiredCount = platformCompetencies.filter(
-                    (c: any) => state.progress[c.id] === true
+                    (c) => state.progress[c.id] === true
                 ).length;
 
                 return Math.round((acquiredCount / platformCompetencies.length) * 100);

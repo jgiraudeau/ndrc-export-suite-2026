@@ -12,7 +12,8 @@ import {
   Library,
   Globe,
   Briefcase,
-  Bot
+  Bot,
+  ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -21,6 +22,8 @@ import { usePathname, useRouter } from "next/navigation";
 export function TeacherSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const whmManagerUrl =
+    process.env.NEXT_PUBLIC_WHM_MANAGER_URL || "https://whm-manager.vercel.app";
 
   const handleLogout = () => {
     localStorage.removeItem("ndrc_token");
@@ -73,6 +76,16 @@ export function TeacherSidebar() {
           );
         })}
       </nav>
+
+      <a
+        href={whmManagerUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors font-bold text-sm"
+      >
+        <ExternalLink size={18} />
+        <span>WHM Manager</span>
+      </a>
 
       <button 
           onClick={handleLogout}

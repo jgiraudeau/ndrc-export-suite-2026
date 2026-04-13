@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
             return apiError("Étudiant introuvable", 404);
         }
 
-        const acquiredCount = student.progress.filter((p: any) => p.acquired).length;
+        const acquiredCount = student.progress.filter((p) => p.acquired).length;
         const totalCompetencies = ALL_COMPETENCIES.length;
         const progressPercentage = totalCompetencies > 0
             ? Math.round((acquiredCount / totalCompetencies) * 100)
@@ -36,13 +36,13 @@ export async function GET(request: NextRequest) {
         const wpIds = ALL_COMPETENCIES.filter(c => c.platform === "WORDPRESS").map(c => c.id);
         const psIds = ALL_COMPETENCIES.filter(c => c.platform === "PRESTASHOP").map(c => c.id);
 
-        const wpAcquired = student.progress.filter((p: any) => p.acquired && wpIds.includes(p.competencyId)).length;
-        const psAcquired = student.progress.filter((p: any) => p.acquired && psIds.includes(p.competencyId)).length;
+        const wpAcquired = student.progress.filter((p) => p.acquired && wpIds.includes(p.competencyId)).length;
+        const psAcquired = student.progress.filter((p) => p.acquired && psIds.includes(p.competencyId)).length;
 
-        const recentActivity = student.progress
-            .sort((a: any, b: any) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        const recentActivity = [...student.progress]
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
             .slice(0, 5)
-            .map((p: any) => {
+            .map((p) => {
                 const comp = ALL_COMPETENCIES.find(c => c.id === p.competencyId);
                 return {
                     id: p.competencyId,
@@ -69,10 +69,10 @@ export async function GET(request: NextRequest) {
                 totalCount: totalCompetencies
             },
             recentActivity,
-            comments: student.comments.map((c: any) => ({
+            comments: student.comments.map((c) => ({
                 id: c.id,
                 text: c.text,
-                author: c.teacher.name,
+                author: c.teacher?.name || "Professeur",
                 date: c.createdAt.toISOString(),
             })),
         });

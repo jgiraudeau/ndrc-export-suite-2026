@@ -33,9 +33,10 @@ export default function TeacherLoginPage() {
         }
 
         // Cas inscription : compte en attente de validation
-        if ("pending" in data && (data as any).pending) {
+        const registrationData = data as { pending?: boolean; message?: string };
+        if ("pending" in data && registrationData.pending) {
             setError("");
-            setSuccessMessage((data as any).message);
+            setSuccessMessage(registrationData.message || "Demande d'inscription envoyée.");
             setMode("login");
             setName("");
             setPassword("");

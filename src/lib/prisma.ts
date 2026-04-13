@@ -7,16 +7,15 @@ import { PrismaPg } from "@prisma/adapter-pg";
 function createPrismaClient() {
     // En production (Vercel/Railway), utiliser l'URL interne ; en local, l'URL publique
     const isProduction = process.env.NODE_ENV === "production";
-    const connectionString = isProduction
+    const connectionString = (isProduction
         ? (process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL || "")
-        : (process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL || "");
+        : (process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL || "")) || "postgresql://dummy:dummy@localhost:5432/dummy";
 
     const adapter = new PrismaPg({ connectionString });
-    return new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
+    return new PrismaClient({ adapter });
 }
 
 declare global {
-    // eslint-disable-next-line no-var
     var prisma: PrismaClient | undefined;
 }
 

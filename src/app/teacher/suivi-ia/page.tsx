@@ -62,7 +62,7 @@ export default function SuiviIAPage() {
               Suivi du <span className="text-purple-600">Tuteur IA</span>
             </h1>
             <p className="text-lg text-slate-400 font-bold max-w-xl">
-              Analysez les interactions de vos étudiants avec l'intelligence artificielle pour identifier les points de blocage.
+              Analysez les interactions de vos étudiants avec l&apos;intelligence artificielle pour identifier les points de blocage.
             </p>
           </div>
           
@@ -101,9 +101,9 @@ export default function SuiviIAPage() {
                 </div>
                 <div>
                   <h3 className="text-slate-400 font-bold text-sm uppercase tracking-widest mb-1">{stat.label}</h3>
-                  <p className="text-5xl font-black text-slate-800 tracking-tighter">
+                  <div className="text-5xl font-black text-slate-800 tracking-tighter">
                     {loading ? <Skeleton className="h-10 w-24 inline-block" /> : stat.value}
-                  </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -146,7 +146,7 @@ export default function SuiviIAPage() {
                        </div>
                        <div className="flex-1">
                           <p className="text-slate-700 font-bold text-sm leading-relaxed mb-2">
-                             "{q.content.substring(0, 100)}{q.content.length > 100 ? "..." : ""}"
+                             {`"${q.content.substring(0, 100)}${q.content.length > 100 ? "..." : ""}"`}
                           </p>
                           <div className="flex items-center gap-3">
                              <Badge variant="outline" className="bg-white border-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-widest px-2 py-0.5">
@@ -183,7 +183,7 @@ export default function SuiviIAPage() {
                 </CardHeader>
                 <CardContent className="p-8">
                    <p className="text-purple-100 font-medium text-sm leading-relaxed mb-6">
-                      L'IA détecte une demande accrue sur <strong>les épreuves E4</strong> cette semaine (60% des échanges).
+                      L&apos;IA détecte une demande accrue sur <strong>les épreuves E4</strong> cette semaine (60% des échanges).
                    </p>
                    <div className="space-y-4">
                       {[
@@ -214,7 +214,7 @@ export default function SuiviIAPage() {
                          <Info size={16} />
                       </div>
                       <p className="text-emerald-800 text-xs font-bold leading-relaxed">
-                         Vos étudiants posent beaucoup de questions sur les critères d'évaluation. Pensez à republier le référentiel E4.
+                         Vos étudiants posent beaucoup de questions sur les critères d&apos;évaluation. Pensez à republier le référentiel E4.
                       </p>
                    </div>
                    <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex gap-3">
@@ -222,7 +222,7 @@ export default function SuiviIAPage() {
                          <Sparkles size={16} />
                       </div>
                       <p className="text-indigo-800 text-xs font-bold leading-relaxed">
-                         L'IA aide 80% des étudiants à débloquer leurs problèmes techniques WordPress en autonomie.
+                         L&apos;IA aide 80% des étudiants à débloquer leurs problèmes techniques WordPress en autonomie.
                       </p>
                    </div>
                 </div>

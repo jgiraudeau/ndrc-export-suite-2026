@@ -74,14 +74,14 @@ export async function GET(req: Request) {
                 date: a.assignedAt,
                 status: "Assigné"
             })),
-            ...recentLogs.map((l: any) => ({
+            ...recentLogs.map((l) => ({
                 id: l.id,
                 type: "log",
                 title: `${l.content.substring(0, 20)}... (${l.assignment?.mission?.title || l.experience?.title || "Projet"})`,
                 date: l.date,
                 status: "Nouveau"
             }))
-        ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+        ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
 
         return NextResponse.json({
             success: true,

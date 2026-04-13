@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
@@ -7,20 +8,45 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body = await req.json();
+    const body = (await req.json()) as {
+      title?: unknown;
+      type?: unknown;
+      description?: unknown;
+      startDate?: unknown;
+      endDate?: unknown;
+      competencyIds?: unknown;
+      status?: unknown;
+      feedback?: unknown;
+    };
     
     // Whitelist fields that can be updated
     const { title, type, description, startDate, endDate, competencyIds, status, feedback } = body;
 
-    const updateData: any = {};
-    if (title !== undefined) updateData.title = title;
-    if (type !== undefined) updateData.type = type;
-    if (description !== undefined) updateData.description = description;
-    if (startDate !== undefined) updateData.startDate = new Date(startDate);
-    if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
-    if (competencyIds !== undefined) updateData.competencyIds = competencyIds;
-    if (status !== undefined) updateData.status = status;
-    if (feedback !== undefined) updateData.feedback = feedback;
+    const updateData: Prisma.ProfessionalExperienceUpdateInput = {};
+    if (typeof title === "string") updateData.title = title.trim();
+    if (typeof type === "string") updateData.type = type.trim();
+    if (typeof description === "string") updateData.description = description;
+    if (startDate !== undefined) {
+      const parsedStartDate = new Date(String(startDate));
+      if (!Number.isNaN(parsedStartDate.getTime())) {
+        updateData.startDate = parsedStartDate;
+      }
+    }
+    if (endDate !== undefined) {
+      if (endDate === null || endDate === "") {
+        updateData.endDate = null;
+      } else {
+        const parsedEndDate = new Date(String(endDate));
+        if (!Number.isNaN(parsedEndDate.getTime())) {
+          updateData.endDate = parsedEndDate;
+        }
+      }
+    }
+    if (Array.isArray(competencyIds) && competencyIds.every((id) => typeof id === "string")) {
+      updateData.competencyIds = competencyIds;
+    }
+    if (typeof status === "string") updateData.status = status;
+    if (feedback === null || typeof feedback === "string") updateData.feedback = feedback;
 
     const experience = await prisma.professionalExperience.update({
       where: { id },

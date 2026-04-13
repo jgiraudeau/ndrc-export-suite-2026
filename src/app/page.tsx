@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import {
-    ArrowRight, CheckCircle2, GraduationCap, Users, LayoutDashboard,
+    ArrowRight, LayoutDashboard,
     Globe, ShoppingBag, BarChart3, Mail, MonitorSmartphone, Share2, ShieldCheck, PenTool
 } from "lucide-react";
-import Image from "next/image";
 
 export default function LandingPage() {
     return (
@@ -47,7 +46,7 @@ export default function LandingPage() {
                 <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-8 leading-tight">
                     Votre passeport pour <br />
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                        l'épreuve E5 Digitale
+                        l&apos;épreuve E5 Digitale
                     </span>
                 </h1>
 

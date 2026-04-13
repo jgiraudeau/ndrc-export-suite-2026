@@ -1,15 +1,14 @@
 import "dotenv/config";
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
 import fs from "fs"
 import path from "path"
 import bcrypt from "bcryptjs"
+import { DIGITAL_COMPETENCIES } from "../src/data/digital-competencies";
 
 const connectionString = `${process.env.DATABASE_URL}`;
-const pool = new pg.Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter } as any);
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
 async function resetAndSeed() {
   console.log("🌱 Début du Seeding...")
@@ -63,7 +62,6 @@ async function resetAndSeed() {
   }
 
   // 3. Importation des Compétences Digitales (E5B)
-  const { DIGITAL_COMPETENCIES } = require("../src/data/digital-competencies")
   for (const skill of DIGITAL_COMPETENCIES) {
     await prisma.competency.upsert({
       where: { code: skill.id },

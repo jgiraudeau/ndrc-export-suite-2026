@@ -6,23 +6,26 @@ import {
   ExternalLink, 
   ShieldCheck, 
   CheckCircle2, 
-  AlertCircle,
-  Layout,
-  Search,
   Settings,
   Sparkles,
   Save,
   Loader2
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { DIGITAL_COMPETENCIES } from "@/data/digital-competencies";
+import type { Competency } from "@/types";
 
-const WP_SKILLS = DIGITAL_COMPETENCIES.filter((s: any) => s.platform === "WORDPRESS");
+type StudentSessionUser = {
+  wpUrl?: string | null;
+};
+
+const WP_SKILLS = DIGITAL_COMPETENCIES.filter(
+  (s): s is Competency & { platform: "WORDPRESS" } => s.platform === "WORDPRESS"
+);
 
 export default function WordPressSkills() {
   const [wpUrl, setWpUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [student, setStudent] = useState<any>(null);
+  const [student, setStudent] = useState<StudentSessionUser | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -70,7 +73,7 @@ export default function WordPressSkills() {
           </div>
           <div>
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">Compétences WordPress</h1>
-            <p className="text-slate-500 font-bold">Maîtrise de l'écosystème CMS pour la relation client digitale.</p>
+            <p className="text-slate-500 font-bold">Maîtrise de l&apos;écosystème CMS pour la relation client digitale.</p>
           </div>
         </div>
       </header>
@@ -82,7 +85,7 @@ export default function WordPressSkills() {
               <Settings size={20} className="text-slate-400" />
               Configuration de votre Site
             </h3>
-            <p className="text-sm text-slate-400 font-bold">Renseignez l'URL de votre application WordPress pour permettre l'évaluation.</p>
+            <p className="text-sm text-slate-400 font-bold">Renseignez l&apos;URL de votre application WordPress pour permettre l&apos;évaluation.</p>
             <div className="flex gap-2 mt-4">
               <input 
                 className="flex-1 bg-slate-50 border-none rounded-xl px-5 py-3 text-sm font-bold text-sky-600 focus:ring-2 focus:ring-sky-500/20 outline-none"
@@ -120,7 +123,7 @@ export default function WordPressSkills() {
             Référentiel Technique E5B
           </h3>
           <div className="space-y-3">
-             {WP_SKILLS.map((skill: any) => (
+             {WP_SKILLS.map((skill) => (
                <div 
                  key={skill.id} 
                  className="bg-white p-5 rounded-2xl border border-slate-100 flex items-center gap-4 group hover:border-sky-200 transition-colors"
@@ -146,7 +149,7 @@ export default function WordPressSkills() {
               </div>
               <h3 className="text-3xl font-black mb-4 leading-tight shrink-0">Vérifier mon site par IA</h3>
               <p className="text-indigo-100 font-bold mb-10 leading-relaxed text-sm">
-                L'Assistant IA NDRC peut analyser votre site WordPress en temps réel pour valider les critères SEO et de structure demandés à l'examen.
+                L&apos;Assistant IA NDRC peut analyser votre site WordPress en temps réel pour valider les critères SEO et de structure demandés à l&apos;examen.
               </p>
            </div>
            
@@ -154,7 +157,7 @@ export default function WordPressSkills() {
              disabled={!wpUrl}
              className="relative z-10 w-full py-5 bg-white text-indigo-600 rounded-[20px] font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-50 disabled:grayscale"
            >
-              Lancer l'Analyse E5B
+              Lancer l&apos;Analyse E5B
            </button>
         </div>
       </div>

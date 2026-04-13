@@ -44,13 +44,6 @@ export async function GET(req: NextRequest) {
             }
         });
 
-        // 3. Thématiques probables (basé sur les titres des sessions)
-        const sessions = await prisma.chatSession.findMany({
-            where: { student: { teacherId } },
-            select: { title: true },
-            take: 100
-        });
-
         return NextResponse.json({
             stats: {
                 studentsCount,

@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
             prisma.teacher.count({ where: { status: "pending" } }),
             prisma.student.count(),
             prisma.class.count(),
-            (prisma as any).professionalExperience.count(),
-            (prisma as any).journalEntry.count()
+            prisma.professionalExperience.count(),
+            prisma.journalEntry.count()
         ]);
 
         return apiSuccess({

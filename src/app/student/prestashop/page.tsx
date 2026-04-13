@@ -5,8 +5,6 @@ import {
   ShoppingBag, 
   ExternalLink, 
   ShieldCheck, 
-  CheckCircle2, 
-  AlertCircle,
   Settings,
   Sparkles,
   Save,
@@ -16,15 +14,21 @@ import {
   CreditCard,
   Target
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { DIGITAL_COMPETENCIES } from "@/data/digital-competencies";
+import type { Competency } from "@/types";
 
-const PS_SKILLS = DIGITAL_COMPETENCIES.filter((s: any) => s.platform === "PRESTASHOP");
+type StudentSessionUser = {
+  prestaUrl?: string | null;
+};
+
+const PS_SKILLS = DIGITAL_COMPETENCIES.filter(
+  (s): s is Competency & { platform: "PRESTASHOP" } => s.platform === "PRESTASHOP"
+);
 
 export default function PrestaShopSkills() {
   const [prestaUrl, setPrestaUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [student, setStudent] = useState<any>(null);
+  const [student, setStudent] = useState<StudentSessionUser | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -84,7 +88,7 @@ export default function PrestaShopSkills() {
               <Settings size={20} className="text-slate-400" />
               Application de Gestion
             </h3>
-            <p className="text-sm text-slate-400 font-bold">Renseignez l'URL de votre boutique PrestaShop pour la validation des acquis.</p>
+            <p className="text-sm text-slate-400 font-bold">Renseignez l&apos;URL de votre boutique PrestaShop pour la validation des acquis.</p>
             <div className="flex gap-2 mt-4">
               <input 
                 className="flex-1 bg-slate-50 border-none rounded-xl px-5 py-3 text-sm font-bold text-amber-600 focus:ring-2 focus:ring-amber-500/20 outline-none"
@@ -122,7 +126,7 @@ export default function PrestaShopSkills() {
             Référentiel E-Commerce
           </h3>
           <div className="space-y-3">
-             {PS_SKILLS.map((skill: any) => (
+             {PS_SKILLS.map((skill) => (
                <div 
                  key={skill.id} 
                  className="bg-white p-5 rounded-2xl border border-slate-100 flex items-center gap-4 group hover:border-amber-200 transition-colors"
@@ -147,7 +151,7 @@ export default function PrestaShopSkills() {
               </div>
               <h3 className="text-xl font-black text-slate-800 tracking-tight leading-4">Vérification de Session</h3>
               <p className="text-slate-400 font-bold text-sm leading-relaxed">
-                Votre boutique doit être paramétrée selon les consignes de mission. N'oubliez pas de mettre vos produits "En ligne" pour qu'ils soient détectables lors du contrôle final.
+                Votre boutique doit être paramétrée selon les consignes de mission. N&apos;oubliez pas de mettre vos produits &quot;En ligne&quot; pour qu&apos;ils soient détectables lors du contrôle final.
               </p>
            </div>
 
@@ -159,7 +163,7 @@ export default function PrestaShopSkills() {
                  </div>
                  <h3 className="text-3xl font-black mb-4 leading-tight shrink-0">Boost de Validation</h3>
                  <p className="text-amber-50 font-bold mb-10 leading-relaxed text-sm">
-                   Prêt pour l'examen ? L'IA peut simuler un parcours client sur votre boutique pour détecter d'éventuels oublis critiques dans le cycle de vente.
+                   Prêt pour l&apos;examen ? L&apos;IA peut simuler un parcours client sur votre boutique pour détecter d&apos;éventuels oublis critiques dans le cycle de vente.
                  </p>
               </div>
               

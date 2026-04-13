@@ -1,14 +1,18 @@
-import JSZip from "jszip";
-import { saveAs } from "file-saver";
 import { PDFService } from "./pdf-service";
 import { DOCXService } from "./docx-service";
 import { apiGetExperiences, apiGetJournal } from "./api-client";
 
-export const ExportUtils = {
-    generateExamPack: async (student: any) => {
-        const zip = new JSZip();
-        const studentFolder = zip.folder(`${student.lastName.toUpperCase()}_${student.firstName}_DOSSIER_EXAMEN`);
+type ExportStudent = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    classCode?: string;
+    name?: string;
+    competencies?: Array<{ competencyId: string; acquired: boolean }>;
+};
 
+export const ExportUtils = {
+    generateExamPack: async (student: ExportStudent) => {
         // 1. Fetch data
         const { data: experiences } = await apiGetExperiences({ studentId: student.id });
         const { data: journal } = await apiGetJournal({ studentId: student.id });

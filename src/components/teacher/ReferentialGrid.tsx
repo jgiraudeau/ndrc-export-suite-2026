@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import { 
   ChevronDown, 
   ChevronUp, 
-  CheckCircle2, 
   Save, 
   Loader2,
   AlertCircle,
@@ -12,13 +11,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiGradeCompetency, apiValidateEvaluation } from "@/lib/api-client";
-import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, Calendar } from "lucide-react";
-
-interface Criterion {
-  description: string;
-}
+import { apiGradeCompetency, apiValidateEvaluation, apiFetch } from "@/lib/api-client";
+import { ShieldCheck, Sparkle } from "lucide-react";
 
 interface CompetencyChild {
   description: string;
@@ -43,6 +37,16 @@ interface ReferentialGridProps {
   validatedAt?: string | null;
 }
 
+type AiSuggestion = {
+  code: string;
+  grade: number;
+  feedback: string;
+};
+
+type AiEvaluateResponse = {
+  suggestions?: AiSuggestion[];
+};
+
 export function ReferentialGrid({ studentId, referential, title, type, initialGrades = {}, readOnly = false, isValidated: initialIsValidated = false, validatedAt: initialValidatedAt = null }: ReferentialGridProps) {
   const [expandedCodes, setExpandedCodes] = useState<Record<string, boolean>>({});
   const [currentGrades, setCurrentGrades] = useState<Record<string, number>>(initialGrades);
@@ -51,6 +55,28 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [isValidated, setIsValidated] = useState(initialIsValidated);
   const [validatedAt, setValidatedAt] = useState<string | null>(initialValidatedAt);
   const [isValidating, setIsValidating] = useState(false);
+  const [aiSuggesting, setAiSuggesting] = useState<string | null>(null);
+
+  const handleAiDiagnosis = async (code: string) => {
+    setAiSuggesting(code);
+    try {
+        const res = await apiFetch<AiEvaluateResponse>("/api/ai/evaluate", {
+            method: "POST",
+            body: JSON.stringify({ studentId, type, competencyCode: code })
+        });
+        if (res.data && res.data.suggestions) {
+            const suggestion = res.data.suggestions.find((s) => s.code.startsWith(code) || code.startsWith(s.code));
+            if (suggestion) {
+                // Apply suggestion (just highlight or fill if empty)
+                alert(`Suggestion IA (${code}): ${suggestion.grade}/4 - ${suggestion.feedback}`);
+            }
+        }
+    } catch (err) {
+        console.error("AI Analysis failed", err);
+    } finally {
+        setAiSuggesting(null);
+    }
+  };
 
   const toggleExpand = (code: string) => {
     setExpandedCodes(prev => ({ ...prev, [code]: !prev[code] }));
@@ -164,7 +190,17 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">{comp.block} — {comp.children.length} ÉLÉMENTS DE COMPÉTENCE</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4">
+                {!readOnly && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleAiDiagnosis(comp.code); }}
+                        disabled={aiSuggesting === comp.code}
+                        className="p-2 hover:bg-amber-100 rounded-xl text-amber-600 transition-all flex items-center gap-2 group/ai"
+                    >
+                        {aiSuggesting === comp.code ? <Loader2 size={16} className="animate-spin" /> : <Sparkle size={16} className="group-hover/ai:animate-spin" />}
+                        <span className="hidden md:inline text-[10px] font-black uppercase tracking-tighter">Aide IA</span>
+                    </button>
+                )}
                 {isDirty && !isExpanded && (
                     <span className="flex h-3 w-3 rounded-full bg-orange-500 animate-pulse" />
                 )}

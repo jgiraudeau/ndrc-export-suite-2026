@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Library,
   FileText,
@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Search,
   X,
-  ArrowLeft,
+  Database,
   FileDown,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -30,6 +30,16 @@ interface SavedDocFull extends SavedDoc {
   content: string;
 }
 
+interface RagDoc {
+  name: string;
+  displayName: string;
+  mimeType: string | null;
+  state: string | null;
+  sizeBytes: number | null;
+  createTime: string | null;
+  updateTime: string | null;
+}
+
 export default function LibraryPage() {
   const [documents, setDocuments] = useState<SavedDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +47,15 @@ export default function LibraryPage() {
   const [selected, setSelected] = useState<SavedDocFull | null>(null);
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [ragDocs, setRagDocs] = useState<RagDoc[]>([]);
+  const [ragStoreName, setRagStoreName] = useState("");
+  const [ragLoading, setRagLoading] = useState(false);
+  const [ragError, setRagError] = useState("");
 
-  const fetchDocuments = async () => {
+  const resolveErrorMessage = (error: unknown, fallback: string): string =>
+    error instanceof Error && error.message ? error.message : fallback;
+
+  const fetchDocuments = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/generate/documents");
@@ -47,11 +64,28 @@ export default function LibraryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchRagDocuments = useCallback(async () => {
+    setRagLoading(true);
+    setRagError("");
+    try {
+      const res = await fetch("/api/rag/documents");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Erreur RAG");
+      setRagDocs(data?.documents ?? []);
+      setRagStoreName(data?.storeName ?? "");
+    } catch (err: unknown) {
+      setRagError(resolveErrorMessage(err, "Impossible de charger le store RAG"));
+    } finally {
+      setRagLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+    fetchRagDocuments();
+  }, [fetchDocuments, fetchRagDocuments]);
 
   const openDocument = async (id: string) => {
     setLoadingDoc(true);
@@ -112,6 +146,57 @@ export default function LibraryPage() {
             <p className="text-slate-500 mt-2 font-medium">
               {documents.length} document{documents.length !== 1 ? "s" : ""} sauvegardé{documents.length !== 1 ? "s" : ""}
             </p>
+          </div>
+        </div>
+
+        {/* RAG Section */}
+        <div className="bg-white border border-slate-200 rounded-[32px] p-6 md:p-8 shadow-sm space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Database size={18} />
+              </div>
+              <div>
+                <p className="font-black text-slate-800 text-sm">RAG Google File Search</p>
+                <p className="text-[11px] text-slate-400 font-bold">
+                  Store: {ragStoreName || "—"}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Gestion des documents centralisée par l&apos;admin.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {ragError && (
+            <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+              {ragError}
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-slate-100 overflow-hidden">
+            {ragLoading ? (
+              <div className="p-6 text-sm text-slate-400 font-bold flex items-center gap-2">
+                <RefreshCw size={14} className="animate-spin" /> Chargement du store RAG...
+              </div>
+            ) : ragDocs.length === 0 ? (
+              <div className="p-6 text-sm text-slate-400 font-bold">
+                Aucun document indexe dans le store RAG.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {ragDocs.slice(0, 8).map((doc) => (
+                  <div key={doc.name} className="p-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-800 truncate">{doc.displayName || doc.name}</p>
+                      <p className="text-[11px] text-slate-400 font-bold truncate">
+                        {doc.mimeType || "mime inconnu"} • {doc.state || "STATE_UNSPECIFIED"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

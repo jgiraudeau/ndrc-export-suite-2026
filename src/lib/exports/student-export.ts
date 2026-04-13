@@ -1,6 +1,14 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { BadgeType, BadgeInfo, calculateBadge } from "./badges";
+import { BadgeInfo } from "./badges";
+
+type AutoTableDoc = jsPDF & {
+    lastAutoTable?: {
+        cursor: {
+            y: number;
+        };
+    };
+};
 
 /**
  * Service de génération des dossiers d'examen NDRC
@@ -20,7 +28,7 @@ export class PDFExportService {
         validatedAt?: string | null
     }) {
         const doc = new jsPDF();
-        const primaryColor = [79, 70, 229]; // Indigo
+        const primaryColor: [number, number, number] = [79, 70, 229]; // Indigo
         
         // Header
         doc.setFontSize(22);
@@ -44,12 +52,12 @@ export class PDFExportService {
             startY: 55,
             head: [['Compétence', 'Élément', 'Évaluation']],
             body: data.grades.map(g => [g.code, g.label, g.scoreLabel]),
-            headStyles: { fillColor: primaryColor as any, textColor: [255, 255, 255] },
-            alternateRowStyles: { fillColor: [249, 250, 251] },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] as [number, number, number] },
+            alternateRowStyles: { fillColor: [249, 250, 251] as [number, number, number] },
         });
 
         // Validation Metadata
-        const finalY = (doc as any).lastAutoTable.cursor.y + 20;
+        const finalY = ((doc as AutoTableDoc).lastAutoTable?.cursor.y ?? 55) + 20;
         
         if (data.isValidated) {
             doc.setDrawColor(16, 185, 129); // Emerald
@@ -91,14 +99,14 @@ export class PDFExportService {
         const doc = new jsPDF();
         
         // Brand logic
-        const colors = {
+        const colors: Record<NonNullable<BadgeInfo["type"]> | "DEFAULT", [number, number, number]> = {
             PLATINE: [148, 163, 184], // Slate 400
             OR: [217, 119, 6],      // Amber
             ARGENT: [100, 116, 139], // Gray 500
             DEFAULT: [79, 70, 229]
         };
         
-        const badgeColor = data.badge.type ? (colors as any)[data.badge.type] : colors.DEFAULT;
+        const badgeColor = data.badge.type ? colors[data.badge.type] : colors.DEFAULT;
 
         // Cover Page
         doc.setFillColor(badgeColor[0], badgeColor[1], badgeColor[2]);
@@ -132,7 +140,7 @@ export class PDFExportService {
             startY: 130,
             head: [['Action / Mission', 'Description', 'Statut']],
             body: data.items.map(i => [i.title, i.description, i.status]),
-            headStyles: { fillColor: badgeColor as any },
+            headStyles: { fillColor: badgeColor },
         });
 
         doc.save(`NDRC_${data.title.replace(' ', '_')}_${data.studentName.replace(' ', '_')}.pdf`);

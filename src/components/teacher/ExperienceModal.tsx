@@ -9,10 +9,8 @@ import {
   Type, 
   AlignLeft, 
   LayoutGrid,
-  Search,
   Users
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { ExperienceMatrix } from "./ExperienceMatrix";
 import { apiCreateExperience, apiUpdateExperience, apiGetStudents, type ProfessionalExperience, type StudentWithProgress } from "@/lib/api-client";
 
@@ -23,6 +21,8 @@ interface ExperienceModalProps {
   experience?: ProfessionalExperience | null;
   studentId?: string; // If creating for a specific student
 }
+
+type ExperienceType = NonNullable<ProfessionalExperience["type"]>;
 
 export function ExperienceModal({ isOpen, onClose, onSuccess, experience, studentId: initialStudentId }: ExperienceModalProps) {
   const [formData, setFormData] = useState<Partial<ProfessionalExperience>>({
@@ -39,33 +39,39 @@ export function ExperienceModal({ isOpen, onClose, onSuccess, experience, studen
   const [fetchingStudents, setFetchingStudents] = useState(false);
 
   useEffect(() => {
-    if (experience) {
-      setFormData({
-        ...experience,
-        startDate: new Date(experience.startDate).toISOString().split("T")[0],
-        endDate: experience.endDate ? new Date(experience.endDate).toISOString().split("T")[0] : undefined
-      });
-    } else {
-      setFormData({
-        title: "",
-        type: "STAGE",
-        description: "",
-        startDate: new Date().toISOString().split("T")[0],
-        competencyIds: [],
-        studentId: initialStudentId || ""
-      });
-    }
+    const nextFormData: Partial<ProfessionalExperience> = experience
+      ? {
+          ...experience,
+          startDate: new Date(experience.startDate).toISOString().split("T")[0],
+          endDate: experience.endDate ? new Date(experience.endDate).toISOString().split("T")[0] : undefined
+        }
+      : {
+          title: "",
+          type: "STAGE",
+          description: "",
+          startDate: new Date().toISOString().split("T")[0],
+          competencyIds: [],
+          studentId: initialStudentId || ""
+        };
+
+    queueMicrotask(() => {
+      setFormData(nextFormData);
+    });
   }, [experience, initialStudentId, isOpen]);
 
   useEffect(() => {
-    if (isOpen && !initialStudentId && !experience) {
+    if (experience) {
+      return;
+    }
+
+    if (isOpen && !initialStudentId) {
       async function loadStudents() {
         setFetchingStudents(true);
         const { data } = await apiGetStudents();
         if (data) setStudents(data);
         setFetchingStudents(false);
       }
-      loadStudents();
+      void loadStudents();
     }
   }, [isOpen, initialStudentId, experience]);
 
@@ -138,7 +144,7 @@ export function ExperienceModal({ isOpen, onClose, onSuccess, experience, studen
                         </label>
                         <select
                           value={formData.type}
-                          onChange={e => setFormData({ ...formData, type: e.target.value as any })}
+                          onChange={e => setFormData({ ...formData, type: e.target.value as ExperienceType })}
                           className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-2 ring-purple-100 outline-none transition-all cursor-pointer"
                         >
                           <option value="STAGE">STAGE</option>
@@ -155,11 +161,12 @@ export function ExperienceModal({ isOpen, onClose, onSuccess, experience, studen
                           </label>
                           <select
                             required
+                            disabled={fetchingStudents}
                             value={formData.studentId}
                             onChange={e => setFormData({ ...formData, studentId: e.target.value })}
                             className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-2 ring-purple-100 outline-none transition-all cursor-pointer"
                           >
-                            <option value="">Sélectionner...</option>
+                            <option value="">{fetchingStudents ? "Chargement..." : "Sélectionner..."}</option>
                             {students.map(s => (
                               <option key={s.id} value={s.id}>{s.lastName} {s.firstName} ({s.classCode})</option>
                             ))}

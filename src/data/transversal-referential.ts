@@ -12,12 +12,18 @@ export interface TransversalBlock {
   }>;
 }
 
+interface ReferentialGroup {
+  code: string;
+  description: string;
+  children: Array<{ description: string }>;
+}
+
 // Convert E4/E6 JSON to a flat list for the matrix
-const formatReferential = (data: any[], block: "E4" | "E6"): TransversalBlock[] => {
+const formatReferential = (data: ReferentialGroup[], block: "E4" | "E6"): TransversalBlock[] => {
   return data.map(group => ({
     id: group.code,
     label: group.description,
-    items: group.children.map((child: any, idx: number) => ({
+    items: group.children.map((child, idx: number) => ({
       id: `${group.code}_${idx}`, // Consistent with current grading ID format
       label: child.description,
       block

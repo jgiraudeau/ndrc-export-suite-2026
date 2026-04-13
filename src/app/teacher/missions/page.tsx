@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Filter, BookOpen, Clock, Users, ChevronRight, PlusCircle, Sparkles, Loader2 } from "lucide-react";
+import { Search, Filter, BookOpen, Clock, Users, ChevronRight, PlusCircle, Sparkles, Loader2 } from "lucide-react";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
-import { apiSuccess } from "@/lib/api-helpers";
 import Link from "next/link";
 
 interface Mission {

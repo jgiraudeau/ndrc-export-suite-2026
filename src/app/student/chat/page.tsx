@@ -36,6 +36,13 @@ interface ChatSession {
   _count: { messages: number };
 }
 
+interface SessionMessageDto {
+  id: string;
+  role: "user" | "model";
+  content: string;
+  createdAt: string;
+}
+
 const SUGGESTIONS = [
   "Comment réussir l'E4 ?",
   "Explique-moi le SEO en NDRC",
@@ -88,8 +95,11 @@ export default function StudentChatPage() {
     try {
       const res = await fetch(`/api/chat/sessions/${sid}`);
       const data = await res.json();
+      const rawMessages: SessionMessageDto[] = Array.isArray(data.messages)
+        ? data.messages
+        : [];
       setMessages(
-        (data.messages ?? []).map((m: any) => ({
+        rawMessages.map((m) => ({
           id: m.id,
           role: m.role,
           content: m.content,
@@ -152,10 +162,13 @@ export default function StudentChatPage() {
     setMessages((prev) => [...prev, botMsg]);
 
     try {
+      const payload: { message: string; sessionId?: string } = { message: messageText };
+      if (currentSessionId) payload.sessionId = currentSessionId;
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText, sessionId: currentSessionId }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok || !res.body) throw new Error("Erreur réseau");
@@ -270,9 +283,17 @@ export default function StudentChatPage() {
               ))
             ) : sessions.length > 0 ? (
               sessions.map((session) => (
-                <button
+                <div
                   key={session.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => loadSessionMessages(session.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      loadSessionMessages(session.id);
+                    }
+                  }}
                   className={cn(
                     "w-full text-left p-4 rounded-2xl transition-all border group relative",
                     currentSessionId === session.id
@@ -297,7 +318,7 @@ export default function StudentChatPage() {
                       <Trash2 size={12} />
                     )}
                   </button>
-                </button>
+                </div>
               ))
             ) : (
               <div className="text-center py-10">

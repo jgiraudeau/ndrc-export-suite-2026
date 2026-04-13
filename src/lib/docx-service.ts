@@ -1,95 +1,40 @@
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, AlignmentType, HeadingLevel, TextRun, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
-import { TRANSVERSAL_REFERENTIAL } from "@/data/transversal-referential";
+import { DIGITAL_COMPETENCIES } from "@/data/digital-competencies";
 import { MarkdownParser } from "./markdown-parser";
 
-const getCompetencyLabel = (id: string) => {
+type StudentCompetencyProgress = {
+    competencyId: string;
+    acquired: boolean;
+};
 
-    for (const block of TRANSVERSAL_REFERENTIAL) {
-        const item = block.items.find(i => i.id === id);
-        if (item) return item.label;
-    }
-    return id;
+type StudentDocxData = {
+    firstName: string;
+    lastName: string;
+    classCode?: string;
+    name?: string;
+    competencies?: StudentCompetencyProgress[];
+};
+
+type JournalLog = {
+    date: string;
+    content: string;
+    isValidated: boolean;
+};
+
+type EvaluationReferential = {
+    code: string;
+    children: Array<{ description: string }>;
+};
+
+type SupportMetadata = {
+    title: string;
+    filename?: string;
 };
 
 export const DOCXService = {
-    generateProPassport: async (student: any, experiences: any[]) => {
-        const validatedExps = experiences.filter(exp => exp.status === "VALIDATED");
 
-        const doc = new Document({
-            sections: [{
-                properties: {},
-                children: [
-                    new Paragraph({
-                        text: "PASSEPORT DE PROFESSIONNALISATION",
-                        heading: HeadingLevel.HEADING_1,
-                        alignment: AlignmentType.CENTER,
-                    }),
-                    new Paragraph({
-                        text: "BTS NÉGOCIATION ET DIGITALISATION DE LA RELATION CLIENT (NDRC)",
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 400 },
-                    }),
-
-                    // Student Info Table
-                    new Table({
-                        width: { size: 100, type: WidthType.PERCENTAGE },
-                        rows: [
-                            new TableRow({
-                                children: [
-                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "CANDIDAT :", bold: true })] })] }),
-                                    new TableCell({ children: [new Paragraph(`${student.firstName.toUpperCase()} ${student.lastName.toUpperCase()}`)] }),
-                                ],
-                            }),
-                            new TableRow({
-                                children: [
-                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "CLASSE :", bold: true })] })] }),
-                                    new TableCell({ children: [new Paragraph(student.classCode || "N/A")] }),
-                                ],
-                            }),
-                        ],
-                    }),
-
-                    new Paragraph({ text: "", spacing: { before: 400 } }),
-
-                    ...validatedExps.flatMap((exp, index) => [
-                        new Paragraph({
-                            children: [new TextRun({ text: `PROJET ${index + 1} : ${exp.title.toUpperCase()}`, bold: true, size: 28, color: "4F46E5" })],
-                            spacing: { before: 400, after: 200 },
-                        }),
-                        new Table({
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            rows: [
-                                new TableRow({
-                                    children: [
-                                        new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "PÉRIODE", bold: true })] })] }),
-                                        new TableCell({ children: [new Paragraph(`Du ${new Date(exp.startDate).toLocaleDateString("fr-FR")} au ${new Date(exp.endDate || exp.startDate).toLocaleDateString("fr-FR")}`)] }),
-                                    ],
-                                }),
-                                new TableRow({
-                                    children: [
-                                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "MISSIONS", bold: true })] })] }),
-                                        new TableCell({ children: [new Paragraph(exp.description || "-")] }),
-                                    ],
-                                }),
-                                new TableRow({
-                                    children: [
-                                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "COMPÉTENCES", bold: true })] })] }),
-                                        new TableCell({ children: [new Paragraph(exp.competencyIds.map((id: string) => `• ${getCompetencyLabel(id)}`).join("\n"))] }),
-                                    ],
-                                }),
-                            ],
-                        }),
-                    ]),
-                ],
-            }],
-        });
-
-        const blob = await Packer.toBlob(doc);
-        saveAs(blob, `PASSEPORT_NDRC_${student.lastName.toUpperCase()}.docx`);
-    },
-
-    generateJournal: async (student: any, logs: any[]) => {
+    generateJournal: async (student: StudentDocxData, logs: JournalLog[]) => {
          const doc = new Document({
             sections: [{
                 children: [
@@ -105,7 +50,7 @@ export const DOCXService = {
                                     new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "STATUT", bold: true })] })] }),
                                 ]
                             }),
-                            ...logs.map((l: any) => new TableRow({
+                            ...logs.map((l) => new TableRow({
                                 children: [
                                     new TableCell({ children: [new Paragraph(new Date(l.date).toLocaleDateString("fr-FR"))] }),
                                     new TableCell({ children: [new Paragraph(l.content)] }),
@@ -121,22 +66,130 @@ export const DOCXService = {
          saveAs(blob, `JOURNAL_NDRC_${student.lastName.toUpperCase()}.docx`);
     },
 
-    generateEvaluationGrid: async (student: any, evaluation: any, type: string) => {
-        // Placeholder for official grid in Word
-        alert("L'export Word des grilles officielles est en cours de validation. Utilisez l'export PDF pour le moment.");
+    generateEvaluationGrid: async (
+        student: StudentDocxData,
+        _evaluation: unknown,
+        type: "E4" | "E6",
+        referential: EvaluationReferential[],
+        grades: Record<string, number>
+    ) => {
+        const title = type === "E4" 
+            ? "ANNEXE V – 4 : GRILLE D'AIDE À L'ÉVALUATION E4" 
+            : "ANNEXE VII – 2 : GRILLE D'AIDE À L'ÉVALUATION E6";
+        
+        const subtitle = type === "E4"
+            ? "RELATION CLIENT et NÉGOCIATION VENTE - Coefficient 5"
+            : "RELATION CLIENT ET ANIMATION DE RÉSEAUX - Coefficient 3";
+
+        const doc = new Document({
+            sections: [{
+                properties: {
+                    page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } }
+                },
+                children: [
+                    new Paragraph({
+                        text: "BTS NÉGOCIATION ET DIGITALISATION DE LA RELATION CLIENT (NDRC)",
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 100 },
+                    }),
+                    new Paragraph({
+                        text: title,
+                        heading: HeadingLevel.HEADING_1,
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 100 },
+                    }),
+                    new Paragraph({
+                        text: subtitle,
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 400 },
+                    }),
+
+                    // Candidate Info
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "NOM DU CANDIDAT :", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph(student.name?.toUpperCase() || student.lastName?.toUpperCase() || "")] }),
+                                ]
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "SESSION :", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph("2025/2026")] }),
+                                ]
+                            })
+                        ]
+                    }),
+
+                    new Paragraph({ text: "", spacing: { before: 400 } }),
+
+                    // Evaluation Table
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            // Header Row
+                            new TableRow({
+                                children: [
+                                    new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "COMPÉTENCES ET CRITÈRES D'ÉVALUATION", bold: true })] })], shading: { fill: "F1F5F9" } }),
+                                    new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "TI", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "F1F5F9" } }),
+                                    new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "I", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "F1F5F9" } }),
+                                    new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "S", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "F1F5F9" } }),
+                                    new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "TS", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "F1F5F9" } }),
+                                ]
+                            }),
+                            // Competency Lines
+                            ...referential.flatMap((comp) => 
+                                comp.children.map((child, idx: number) => {
+                                    const gradeValue = grades[`${comp.code}_${idx}`];
+                                    return new TableRow({
+                                        children: [
+                                            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: comp.code, bold: true }), new TextRun({ text: ` - ${child.description}`, size: 20 })] })] }),
+                                            new TableCell({ children: [new Paragraph({ text: gradeValue === 1 ? "X" : "", alignment: AlignmentType.CENTER })] }),
+                                            new TableCell({ children: [new Paragraph({ text: gradeValue === 2 ? "X" : "", alignment: AlignmentType.CENTER })] }),
+                                            new TableCell({ children: [new Paragraph({ text: gradeValue === 3 ? "X" : "", alignment: AlignmentType.CENTER })] }),
+                                            new TableCell({ children: [new Paragraph({ text: gradeValue === 4 ? "X" : "", alignment: AlignmentType.CENTER })] }),
+                                        ]
+                                    });
+                                })
+                            )
+                        ]
+                    }),
+
+                    new Paragraph({ text: "", spacing: { before: 800 } }),
+
+                    // Official Stamp Area
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Visa de l'évaluateur :", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Cachet de l'établissement :", bold: true })] })] }),
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }]
+        });
+
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `GRILLE_${type}_${student.name?.replace(/\s+/g, '_') || "CANDIDAT"}.docx`);
     },
 
     /**
      * Génère un support pédagogique général (Dossier Prof, Étudiant, Planning, etc.)
      * Convertit les tableaux Markdown en tableaux natifs Word.
      */
-    generateAISupport: async (metadata: any, content: string, track: string) => {
+    generateAISupport: async (metadata: SupportMetadata, content: string, track: string) => {
         const { title, filename } = metadata;
         
         const tableData = MarkdownParser.extractTable(content);
         const textOnly = MarkdownParser.removeTables(content);
 
-        const children: any[] = [
+        const children: Array<Paragraph | Table> = [
             new Paragraph({
                 text: "SUPPORT PÉDAGOGIQUE NDRC",
                 heading: HeadingLevel.HEADING_1,
@@ -228,6 +281,139 @@ export const DOCXService = {
 
         const blob = await Packer.toBlob(doc);
         saveAs(blob, `${filename || "Support_NDRC"}.docx`);
+    },
+
+    /**
+     * Professional Passport - Transversal synthesis (E4, E5B, E6)
+     */
+    generateProPassport: async (student: StudentDocxData, _skills: unknown[]) => {
+        void _skills;
+        const studentCompetencies = student.competencies ?? [];
+        const hasAcquiredSkill = (skillId: string) =>
+            studentCompetencies.some((p) => p.competencyId === skillId && p.acquired);
+
+        const doc = new Document({
+            sections: [{
+                properties: {
+                    page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } }
+                },
+                children: [
+                    new Paragraph({
+                        text: "PASSEPORT PROFESSIONNEL NDRC 2026",
+                        heading: HeadingLevel.HEADING_1,
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 300 },
+                    }),
+                    new Paragraph({
+                        text: "SYNTHÈSE TRANSVERSALE DES COMPÉTENCES ET CERTIFICATIONS",
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 600 },
+                    }),
+
+                    // Identity Block
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "CANDIDAT :", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph(`${student.name || `${student.firstName} ${student.lastName}`}`)] }),
+                                ]
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "PROFIL :", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph("BTS Négociation et Digitalisation de la Relation Client")] }),
+                                ]
+                            })
+                        ]
+                    }),
+
+                    new Paragraph({ text: "", spacing: { before: 400 } }),
+
+                    // Section E4/E6
+                    new Paragraph({
+                        text: "I. COMPÉTENCES COMMERCIALES (E4 - E6)",
+                        heading: HeadingLevel.HEADING_2,
+                        spacing: { after: 200, before: 400 },
+                    }),
+                    new Paragraph("Données issues de la Grille d'Aide à l'Évaluation Session 2025/2026."),
+                    
+                    // Section Digitize E5B
+                    new Paragraph({
+                        text: "II. COMPÉTENCES DIGITALES ET TECHNIQUES (E5B)",
+                        heading: HeadingLevel.HEADING_2,
+                        spacing: { after: 200, before: 400 },
+                    }),
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Plateforme WordPress", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph("Validation de l'application digitale validée")] }),
+                                ]
+                            }),
+                            new TableRow({
+                                children: [
+                                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Plateforme PrestaShop", bold: true })] })] }),
+                                    new TableCell({ children: [new Paragraph("Gestion commerce connecté certifiée")] }),
+                                ]
+                            })
+                        ]
+                    }),
+
+                    // DIGITAL SYNTHESIS (E5B)
+                    new Paragraph({ children: [new TextRun({ text: "VOLET DIGITAL (E5B - WordPress & PrestaShop)", bold: true, size: 28, color: "1e1e2e" })], spacing: { before: 800, after: 400 } }),
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({ width: { size: 70, type: WidthType.PERCENTAGE }, shading: { fill: "f8fafc" }, children: [new Paragraph({ children: [new TextRun({ text: "Compétence Digitale / CMS", bold: true })] })] }),
+                                    new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, shading: { fill: "f8fafc" }, children: [new Paragraph({ children: [new TextRun({ text: "État de Validation", bold: true }), new TextRun({ text: " (IA certified)", italics: true, size: 16 })] })] }),
+                                ]
+                            }),
+                            ...DIGITAL_COMPETENCIES.map(skill => (
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${skill.platform} : `, bold: true }), new TextRun({ text: skill.label })] })] }),
+                                        new TableCell({ 
+                                            shading: { fill: hasAcquiredSkill(skill.id) ? "ecfdf5" : "ffffff" },
+                                            children: [new Paragraph({ 
+                                                alignment: AlignmentType.CENTER,
+                                                children: [new TextRun({ 
+                                                    text: hasAcquiredSkill(skill.id) ? "✅ ACQUIS" : "⭕ EN COURS",
+                                                    bold: true,
+                                                    color: hasAcquiredSkill(skill.id) ? "059669" : "94a3b8"
+                                                })] 
+                                            })] 
+                                        }),
+                                    ]
+                                })
+                            ))
+                        ]
+                    }),
+
+                    new Paragraph({ text: "", spacing: { before: 800 } }),
+
+                    // Signature Area
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "Cachet de l'Établissement", bold: true, italics: true })] })] }),
+                                    new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "Visa du Formateur Référent", bold: true, italics: true })] })] }),
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }]
+        });
+
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `PASSEPORT_PRO_NDRC_${student.lastName || "CANDIDAT"}.docx`);
     }
 };
-

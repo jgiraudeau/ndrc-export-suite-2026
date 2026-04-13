@@ -2,14 +2,15 @@ export type Platform = 'WORDPRESS' | 'PRESTASHOP';
 
 export interface Competency {
     id: string;
-    category: string; // ex: "Apparence", "Contenu", "SEO"
-    level: number; // 1 to 4
-    label: string; // ex: "Installer l'extension Yoast"
-    platform: Platform;
+    label: string;
+    category?: string; // ex: "Apparence", "Contenu", "SEO"
+    level?: number; // 1 to 4
+    platform?: Platform;
+    block?: string; // E4, E5B, E6
     isAcquired: boolean;
     // Smart Check features
-    autoCheckAvailable?: boolean; // True si on peut valider via API
-    checkEndpoint?: string; // ex: "/api/check-plugin?plugin=wordpress-seo"
+    autoCheckAvailable?: boolean;
+    checkEndpoint?: string;
 }
 
 export interface StudentSite {

@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, CheckCircle, XCircle, Trash2, Users, BookOpen, LogOut, Clock, Filter, BarChart3, Key, FileText, ClipboardList } from "lucide-react";
+import Link from "next/link";
+import { Shield, CheckCircle, XCircle, Trash2, Users, BookOpen, LogOut, Clock, BarChart3, Key, FileText, ClipboardList, Database, ExternalLink } from "lucide-react";
 import { apiGetTeachers, apiManageTeacher, apiGetAdminStats, type TeacherAdmin, type AdminStats } from "@/lib/api-client";
 
 type StatusFilter = "all" | "pending" | "active" | "rejected";
 
 export default function AdminDashboardPage() {
     const router = useRouter();
+    const whmManagerUrl =
+        process.env.NEXT_PUBLIC_WHM_MANAGER_URL || "https://whm-manager.vercel.app";
     const [teachers, setTeachers] = useState<TeacherAdmin[]>([]);
     const [stats, setStats] = useState<AdminStats | null>(null);
     const [filter, setFilter] = useState<StatusFilter>("all");
@@ -45,7 +48,9 @@ export default function AdminDashboardPage() {
             router.push("/admin/login");
             return;
         }
-        loadData();
+        queueMicrotask(() => {
+            void loadData();
+        });
     }, [router, loadData]);
 
     const handleAction = async (teacherId: string, action: "approve" | "reject" | "delete" | "reset_password") => {
@@ -123,9 +128,29 @@ export default function AdminDashboardPage() {
             <div className="max-w-6xl mx-auto p-6">
                 
                 {/* Platform KPIs */}
-                <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <BarChart3 size={16} /> Indicateurs Plateforme
-                </h2>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <BarChart3 size={16} /> Indicateurs Plateforme
+                    </h2>
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={whmManagerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[11px] font-black uppercase tracking-wider hover:bg-slate-100"
+                        >
+                            <ExternalLink size={14} />
+                            WHM Manager
+                        </a>
+                        <Link
+                            href="/admin/rag"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[11px] font-black uppercase tracking-wider hover:bg-slate-100"
+                        >
+                            <Database size={14} />
+                            Base RAG
+                        </Link>
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
                     <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                         <div className="flex items-center justify-between mb-2">

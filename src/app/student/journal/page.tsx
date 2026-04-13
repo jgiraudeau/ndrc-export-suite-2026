@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
     ArrowLeft, 
-    BookOpen, 
     Calendar, 
     CheckCircle2, 
     Plus, 
@@ -15,11 +14,11 @@ import {
     ImageIcon,
     Send,
     ChevronRight,
-    MapPin,
     PenLine,
     MessageSquare,
     Link as LinkIcon
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -40,10 +39,28 @@ interface Item {
     type: "MISSION" | "EXPERIENCE";
     status: string;
     date: string;
-    icon: any;
+    icon: LucideIcon;
     journal: JournalEntry[];
     competencyIds: string[];
 }
+
+type MissionApiItem = {
+    id: string;
+    title: string;
+    status: string;
+    assignedAt: string;
+    journal?: JournalEntry[];
+    competencyIds?: string[];
+};
+
+type ExperienceApiItem = {
+    id: string;
+    title: string;
+    status: string;
+    startDate: string;
+    journal?: JournalEntry[];
+    competencyIds?: string[];
+};
 
 export default function StudentJournalPage() {
     const router = useRouter();
@@ -55,11 +72,7 @@ export default function StudentJournalPage() {
     const [isPosting, setIsPosting] = useState(false);
     const [showLinkInput, setShowLinkInput] = useState(false);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    async function fetchData() {
+    const fetchData = useCallback(async () => {
         try {
             const token = localStorage.getItem("ndrc_token");
             if (!token) { router.push("/student/login"); return; }
@@ -71,9 +84,11 @@ export default function StudentJournalPage() {
 
             const missions = await missionsRes.json();
             const experiences = await expRes.json();
+            const missionItems: MissionApiItem[] = Array.isArray(missions?.data) ? missions.data : [];
+            const experienceItems: ExperienceApiItem[] = Array.isArray(experiences) ? experiences : [];
 
             const combined: Item[] = [
-                ...(missions.data || []).map((m: any) => ({
+                ...missionItems.map((m) => ({
                     id: m.id,
                     title: m.title,
                     type: "MISSION" as const,
@@ -83,7 +98,7 @@ export default function StudentJournalPage() {
                     journal: m.journal || [],
                     competencyIds: m.competencyIds || []
                 })),
-                ...(Array.isArray(experiences) ? experiences : []).map((e: any) => ({
+                ...experienceItems.map((e) => ({
                     id: e.id,
                     title: e.title,
                     type: "EXPERIENCE" as const,
@@ -101,7 +116,11 @@ export default function StudentJournalPage() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [router]);
+
+    useEffect(() => {
+        void fetchData();
+    }, [fetchData]);
 
     async function handlePostLog() {
         if (!selectedItem || !newLog.trim()) return;

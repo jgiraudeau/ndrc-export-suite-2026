@@ -35,7 +35,7 @@ export async function POST(request: Request) {
             }
         });
 
-    } catch (error) {
+    } catch {
         return NextResponse.json({ success: false, message: "Erreur serveur interne." }, { status: 500 });
     }
 }

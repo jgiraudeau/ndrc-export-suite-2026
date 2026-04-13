@@ -4,8 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-    ArrowLeft, CheckCircle2, BookOpen, Save, ExternalLink,
-    ChevronDown, ChevronUp, Loader2, Globe, User, Filter, GraduationCap, FileDown, FileCheck, ClipboardList
+    CheckCircle2, BookOpen, Save, Loader2, User, FileDown, ClipboardList
 } from "lucide-react";
 import { ALL_COMPETENCIES } from "@/data/competencies";
 import { ReferentialGrid } from "@/components/teacher/ReferentialGrid";
@@ -28,6 +27,8 @@ const LEVEL_NAMES: Record<number, string> = {
 
 type PlatformFilter = "ALL" | "WORDPRESS" | "PRESTASHOP";
 type EvalFilter = "ALL" | "TO_EVALUATE" | "VALIDATED" | "REJECTED";
+type ReferentialChild = { description: string };
+type ReferentialBlock = { code: string; children?: ReferentialChild[] };
 
 export default function StudentDetailPage() {
     const params = useParams();
@@ -52,17 +53,14 @@ export default function StudentDetailPage() {
     }, [searchParams]);
 
     // Filtres
-    const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("ALL");
-    const [levelFilter, setLevelFilter] = useState<number | null>(null);
-    const [evalFilter, setEvalFilter] = useState<EvalFilter>("ALL");
+    const [platformFilter] = useState<PlatformFilter>("ALL");
+    const [levelFilter] = useState<number | null>(null);
+    const [evalFilter] = useState<EvalFilter>("ALL");
 
     // État local de notation : { [competencyId]: { teacherStatus, teacherFeedback } }
     const [gradeInputs, setGradeInputs] = useState<Record<string, { teacherStatus: number; teacherFeedback: string }>>({});
     const [savingId, setSavingId] = useState<string | null>(null);
     const [savedId, setSavedId] = useState<string | null>(null);
-
-    // Sections dépliées/repliées
-    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
     const fetchStudent = useCallback(async () => {
         if (!studentId) return;
@@ -147,9 +145,12 @@ export default function StudentDetailPage() {
 
         // 2. E4/E6 Referentials
         const data = id.startsWith("E4") ? E4_DATA : E6_DATA;
-        for (const block of data) {
-            for (const child of (block as any).children) {
-                if (id === child.id || id.includes(child.id)) return child.description;
+        for (const block of data as ReferentialBlock[]) {
+            for (const [idx, child] of (block.children ?? []).entries()) {
+                const childCode = `${block.code}_${idx}`;
+                if (id === childCode || id.includes(childCode) || id.includes(block.code)) {
+                    return child.description;
+                }
             }
         }
         return id;

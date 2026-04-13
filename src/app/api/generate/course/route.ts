@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildSystemPrompt, DOCUMENT_TYPE_LABELS, DocumentType } from '@/lib/ai/prompts';
 import { generateText } from '@/lib/ai/gemini';
+import {
+  ensureGlobalFileSearchStore,
+} from '@/lib/ai/file-search';
 import { prisma } from '@/lib/prisma';
 import { verifyToken, extractToken } from '@/lib/jwt';
 
@@ -47,10 +50,20 @@ export async function POST(req: NextRequest) {
     // Ajout de la consigne d'extraction de nom de fichier (comme dans profvirtuel)
     userMessage += `\n\nIMPORTANT : La première ligne de ta réponse doit être un commentaire HTML caché contenant un nom de fichier court et simplifié (max 30 chars, pas d'espace, pas d'accents, use des underscores). Format : \`<!-- FILENAME: Nom_Fichier -->\`.`;
 
-    // 4. Appel Gemini
-    const rawContent = await generateText(systemPrompt, userMessage);
+    // 4. Préparer le store RAG global (piloté par l'admin)
+    let ragStoreName: string | null = null;
+    try {
+      ragStoreName = await ensureGlobalFileSearchStore();
+    } catch (err) {
+      console.error('[generate/course][file-search] Unable to resolve global RAG store:', err);
+    }
 
-    // 5. Extraction du nom de fichier et nettoyage
+    // 5. Appel Gemini (avec RAG si disponible)
+    const rawContent = await generateText(systemPrompt, userMessage, {
+      fileSearchStoreNames: ragStoreName ? [ragStoreName] : undefined,
+    });
+
+    // 6. Extraction du nom de fichier et nettoyage
     let content = rawContent;
     let filename = `${topic.slice(0, 20).replace(/\s+/g, '_')}_${documentType}`;
     
@@ -60,7 +73,7 @@ export async function POST(req: NextRequest) {
       content = rawContent.replace(filenameMatch[0], '').trim();
     }
 
-    // 6. Sauvegarde en base de données
+    // 7. Sauvegarde en base de données
     const savedDoc = await prisma.savedDocument.create({
       data: {
         title: topic,

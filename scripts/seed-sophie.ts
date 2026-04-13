@@ -1,15 +1,13 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const connectionString = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL || "";
-const pool = new pg.Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter } as any);
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
     console.log("--- Seeding Sophie Martin ---");
@@ -43,7 +41,7 @@ async function main() {
 
         // 3. Créer Sophie Martin
         const passwordHash = await bcrypt.hash("password123", 10);
-        const sophie = await prisma.student.upsert({
+        await prisma.student.upsert({
             where: { identifier: "sophie.martin" },
             update: { passwordHash },
             create: {
@@ -70,5 +68,4 @@ main()
     .catch(e => console.error(e))
     .finally(async () => {
         await prisma.$disconnect();
-        await pool.end();
     });

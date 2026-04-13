@@ -1,10 +1,12 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type Content, type GenerateContentConfig } from "@google/genai";
 
-if (!process.env.GOOGLE_API_KEY) {
-  throw new Error('Missing GOOGLE_API_KEY environment variable');
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
+if (!GEMINI_API_KEY) {
+  throw new Error("Missing GEMINI_API_KEY / GOOGLE_API_KEY environment variable");
 }
 
-export const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
+export const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 /**
  * Génère du contenu avec Gemini Pro en mode texte.
@@ -13,18 +15,35 @@ export const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
  */
 export async function generateText(
   systemInstruction: string,
-  userMessage: string
+  userMessage: string,
+  options?: {
+    model?: string;
+    fileSearchStoreNames?: string[];
+  }
 ): Promise<string> {
+  const model = options?.model || "gemini-2.5-flash-lite";
+  const config: GenerateContentConfig = {
+    systemInstruction,
+    temperature: 0.7,
+    maxOutputTokens: 8192,
+  };
+
+  if (options?.fileSearchStoreNames?.length) {
+    config.tools = [
+      {
+        fileSearch: {
+          fileSearchStoreNames: options.fileSearchStoreNames,
+        },
+      },
+    ];
+  }
+
   const response = await genAI.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model,
     contents: userMessage,
-    config: {
-      systemInstruction,
-      temperature: 0.7,
-      maxOutputTokens: 8192,
-    },
+    config,
   });
-  return response.text ?? '';
+  return response.text ?? "";
 }
 
 /**
@@ -33,16 +52,33 @@ export async function generateText(
  */
 export async function* generateTextStream(
   systemInstruction: string,
-  messages: { role: 'user' | 'model'; parts: { text: string }[] }[]
+  messages: Content[],
+  options?: {
+    model?: string;
+    fileSearchStoreNames?: string[];
+  }
 ): AsyncIterable<string> {
+  const model = options?.model || "gemini-2.5-flash-lite";
+  const config: GenerateContentConfig = {
+    systemInstruction,
+    temperature: 0.7,
+    maxOutputTokens: 4096,
+  };
+
+  if (options?.fileSearchStoreNames?.length) {
+    config.tools = [
+      {
+        fileSearch: {
+          fileSearchStoreNames: options.fileSearchStoreNames,
+        },
+      },
+    ];
+  }
+
   const stream = await genAI.models.generateContentStream({
-    model: 'gemini-2.0-flash',
+    model,
     contents: messages,
-    config: {
-      systemInstruction,
-      temperature: 0.7,
-      maxOutputTokens: 4096,
-    },
+    config,
   });
 
   for await (const chunk of stream) {

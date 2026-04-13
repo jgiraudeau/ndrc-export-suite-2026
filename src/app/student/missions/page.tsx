@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Target, Briefcase, Loader2, Sparkles, Download, FileText, BookmarkCheck, Clock, CheckCircle2, Play } from "lucide-react";
 import Link from "next/link";
-import { apiGetProgress, apiGetMyMissions, apiUpdateMissionStatus, apiSaveMission, apiFetch, type MissionAssignmentData } from "@/lib/api-client";
+import { apiGetProgress, apiGetMyMissions, apiUpdateMissionStatus, apiSaveMission, apiFetch, type MissionAssignmentData, type ProgressRecord } from "@/lib/api-client";
 import { ALL_COMPETENCIES } from "@/data/competencies";
 import { cn } from "@/lib/utils";
 import { jsPDF } from "jspdf";
@@ -12,6 +12,18 @@ import { calculateBadge } from "@/lib/exports/badges";
 import { PDFExportService } from "@/lib/exports/student-export";
 
 type Tab = "assigned" | "generate";
+type StudentProfileData = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    identifier: string;
+    classId: string;
+    wpUrl: string | null;
+    prestaUrl: string | null;
+    classCode: string;
+    name: string;
+};
+type StudentProfileResponse = { student: StudentProfileData };
 
 export default function MissionsPage() {
     const router = useRouter();
@@ -29,8 +41,8 @@ export default function MissionsPage() {
     const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3 | 4>(2);
     const [selectedCategory, setSelectedCategory] = useState<string>("Toutes");
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [progress, setProgress] = useState<any>(null);
-    const [studentData, setStudentData] = useState<any>(null);
+    const [progress, setProgress] = useState<ProgressRecord[] | null>(null);
+    const [studentData, setStudentData] = useState<StudentProfileData | null>(null);
 
     const [missionMarkdown, setMissionMarkdown] = useState<{ text: string, ids: string[] } | null>(null);
     const [errorMsg, setErrorMsg] = useState("");
@@ -43,7 +55,7 @@ export default function MissionsPage() {
         Promise.all([
             apiGetProgress(),
             apiGetMyMissions(),
-            apiFetch<any>("/api/student/profile")
+            apiFetch<StudentProfileResponse>("/api/student/profile")
         ]).then(([progressRes, missionsRes, profileRes]) => {
             if (progressRes.data) setProgress(progressRes.data);
             if (missionsRes.data) setAssignedMissions(missionsRes.data);
@@ -53,13 +65,22 @@ export default function MissionsPage() {
     }, [router]);
 
     // Derived competency data
-    const platformCompetencies = ALL_COMPETENCIES.filter(c => c.platform === selectedPlatform);
-    const categories = ["Toutes", ...Array.from(new Set(platformCompetencies.map(c => c.category)))];
+    const platformCompetencies = useMemo(
+        () => ALL_COMPETENCIES.filter(c => c.platform === selectedPlatform),
+        [selectedPlatform]
+    );
+    const categories = useMemo(
+        () => ["Toutes", ...Array.from(new Set(platformCompetencies.map(c => c.category)))],
+        [platformCompetencies]
+    );
+
+    useEffect(() => {
+        setSelectedIds([]);
+    }, [selectedPlatform]);
 
     useEffect(() => {
         if (!categories.includes(selectedCategory)) setSelectedCategory("Toutes");
-        setSelectedIds([]);
-    }, [selectedPlatform]);
+    }, [categories, selectedCategory]);
 
     const displayCompetencies = platformCompetencies.filter(c => selectedCategory === "Toutes" || c.category === selectedCategory);
 
@@ -76,8 +97,9 @@ export default function MissionsPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Erreur serveur");
             setMissionMarkdown({ text: data.mission, ids: selectedIds });
-        } catch (err: any) {
-            setErrorMsg(err.message || "Impossible de joindre Gemini pour générer cette mission.");
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Impossible de joindre Gemini pour générer cette mission.";
+            setErrorMsg(message);
         } finally { setGenerating(false); }
     };
 
@@ -156,16 +178,16 @@ export default function MissionsPage() {
                             {progress && (
                                 <div className={cn(
                                     "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border",
-                                    calculateBadge(progress.filter((p: any) => p.teacherStatus != null).length, progress.length).color
+                                    calculateBadge(progress.filter((p) => p.teacherStatus != null).length, progress.length).color
                                 )}>
-                                    {calculateBadge(progress.filter((p: any) => p.teacherStatus != null).length, progress.length).label}
+                                    {calculateBadge(progress.filter((p) => p.teacherStatus != null).length, progress.length).label}
                                 </div>
                             )}
                         </div>
                         <button 
                             onClick={() => {
                                 if (!studentData || !progress) return;
-                                const badge = calculateBadge(progress.filter((p: any) => p.teacherStatus != null).length, progress.length);
+                                const badge = calculateBadge(progress.filter((p) => p.teacherStatus != null).length, progress.length);
                                 PDFExportService.generateBadgeExport({
                                     title: "Épreuve E5B - Dossier de Missions",
                                     studentName: studentData.name,
@@ -192,7 +214,7 @@ export default function MissionsPage() {
                             <div className="text-center py-12 text-slate-400">
                                 <Target size={48} className="mx-auto mb-3 opacity-30" />
                                 <p className="font-bold">Aucune épreuve assignée</p>
-                                <p className="text-sm mt-1">Ton formateur t'assignera des épreuves ici</p>
+                                <p className="text-sm mt-1">Ton formateur t&apos;assignera des épreuves ici</p>
                             </div>
                         ) : assignedMissions.map(mission => (
                             <div key={mission.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -279,7 +301,7 @@ export default function MissionsPage() {
                                     </div>
                                     <h2 className="text-xl font-black text-slate-800">Créer une Épreuve E5B</h2>
                                     <p className="text-slate-500 text-sm">
-                                        Paramètre les objectifs de ton entraînement. L'IA générera un scénario sur mesure.
+                                        Paramètre les objectifs de ton entraînement. L&apos;IA générera un scénario sur mesure.
                                     </p>
                                 </div>
 
@@ -297,7 +319,7 @@ export default function MissionsPage() {
 
                                     {/* Niveau */}
                                     <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">2. Niveau d'exigence</label>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">2. Niveau d&apos;exigence</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             {[
                                                 { val: 1, label: "Découverte" },
@@ -347,7 +369,7 @@ export default function MissionsPage() {
                                     {/* Contexte */}
                                     <div className="pt-2 border-t border-slate-100">
                                         <label className="block text-sm font-bold text-slate-700 mb-2">
-                                            4. Contexte d'Entreprise <span className="text-slate-400 font-normal">(Optionnel)</span>
+                                            4. Contexte d&apos;Entreprise <span className="text-slate-400 font-normal">(Optionnel)</span>
                                         </label>
                                         <input type="text" value={selectedContext} onChange={e => setSelectedContext(e.target.value)}
                                             placeholder="Ex: Boutique de sneakers, Agence web..."
@@ -426,7 +448,7 @@ function MissionResult({ markdown, targetIds, onReset, onSave, justSaved }: {
                 {targetIds && targetIds.length > 0 && (
                     <div className="col-span-2 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex flex-col gap-3">
                         <p className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Mission terminée ?</p>
-                        <p className="text-sm text-indigo-700 mb-1">N'oublie pas d'aller valider les compétences :</p>
+                        <p className="text-sm text-indigo-700 mb-1">N&apos;oublie pas d&apos;aller valider les compétences :</p>
                         <div className="flex flex-col gap-2">
                             {targetIds.map(id => {
                                 const c = ALL_COMPETENCIES.find(comp => comp.id === id);

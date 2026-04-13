@@ -16,12 +16,10 @@ import {
   Layers,
   GraduationCap,
   FileDown,
-  Layout,
   Table as TableIcon,
   HelpCircle
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { jsPDF } from "jspdf";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
 import { DOCUMENT_TYPE_LABELS, DocumentType } from "@/lib/ai/prompts";
 import { PDFService } from "@/lib/pdf-service";
@@ -130,7 +128,7 @@ export default function TeacherGenerate() {
             } else {
                 throw new Error("Export failed");
             }
-        } catch (error) {
+        } catch {
             alert("Erreur lors de l'exportation du quiz.");
         } finally {
             setExporting(null);

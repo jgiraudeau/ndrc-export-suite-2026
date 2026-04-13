@@ -27,11 +27,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             return apiError("Étudiant introuvable", 404);
         }
 
-        const acquiredCount = student.progress.filter((p: any) => p.acquired).length;
+        const acquiredCount = student.progress.filter((p) => p.acquired).length;
 
         let lastActive = null;
         if (student.progress.length > 0) {
-            const sorted = [...student.progress].sort((a: any, b: any) =>
+            const sorted = [...student.progress].sort((a, b) =>
                 new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
             );
             lastActive = sorted[0].updatedAt.toISOString();
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             prestaUrl: student.prestaUrl,
             acquiredCount,
             lastActive,
-            competencies: student.progress.map((p: any) => ({
+            competencies: student.progress.map((p) => ({
                 competencyId: p.competencyId,
                 acquired: p.acquired,
                 status: p.status,
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
                 teacherFeedback: p.teacherFeedback,
                 teacherGradedAt: p.teacherGradedAt?.toISOString() ?? null,
             })),
-            comments: student.comments.map((c: any) => ({
+            comments: student.comments.map((c) => ({
                 id: c.id,
                 text: c.text,
                 authorName: c.teacher?.name || "Professeur",
@@ -79,7 +79,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     try {
         const params = await context.params;
         const studentId = params.id;
-        const body = await request.json();
+        const body = (await request.json()) as { wpUrl?: unknown; prestaUrl?: unknown };
 
         // Check if student belongs to the teacher
         const existingStudent = await prisma.student.findUnique({
@@ -94,9 +94,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             return apiError("Non autorisé à modifier cet étudiant", 403);
         }
 
-        const dataToUpdate: any = {};
-        if (body.wpUrl !== undefined) dataToUpdate.wpUrl = body.wpUrl;
-        if (body.prestaUrl !== undefined) dataToUpdate.prestaUrl = body.prestaUrl;
+        const dataToUpdate: { wpUrl?: string | null; prestaUrl?: string | null } = {};
+        if (body.wpUrl !== undefined) {
+            dataToUpdate.wpUrl = typeof body.wpUrl === "string" ? body.wpUrl.trim() : null;
+        }
+        if (body.prestaUrl !== undefined) {
+            dataToUpdate.prestaUrl =
+                typeof body.prestaUrl === "string" ? body.prestaUrl.trim() : null;
+        }
 
         if (Object.keys(dataToUpdate).length === 0) {
             return apiError("Aucune donnée à mettre à jour", 400);

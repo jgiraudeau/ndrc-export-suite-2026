@@ -24,23 +24,25 @@ interface User {
     classCode?: string; // Seulement pour étudiants
 }
 
+type AuthResult = { success: boolean; message?: string };
+
 interface AuthStore {
     user: User | null;
     isAuthenticated: boolean;
 
     // Actions
-    loginStudent: (classCode: string, pin: string) => Promise<{ success: boolean; message?: string }>;
-    loginTeacher: (email: string, code: string) => Promise<{ success: boolean; message?: string }>;
+    loginStudent: (classCode: string, pin: string) => Promise<AuthResult>;
+    loginTeacher: (email: string, code: string) => Promise<AuthResult>;
     logout: () => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
     persist(
-        (set: any) => ({
+        (set) => ({
             user: null as User | null,
             isAuthenticated: false as boolean,
 
-            loginStudent: async (classCode: string, pin: string): Promise<any> => {
+            loginStudent: async (classCode: string, pin: string): Promise<AuthResult> => {
                 // 1. Vérifier dans les données importées par le prof (PRIORITÉ)
                 const importedStudents = useTeacherStore.getState().students;
                 const foundImported = importedStudents.find(
@@ -56,9 +58,6 @@ export const useAuthStore = create<AuthStore>()(
                 }
 
                 // 2. Fallback sur les Mocks (si pas trouvé dans l'import)
-                const validClass = MOCK_CLASSES.find(c => c.code.toUpperCase() === classCode.toUpperCase());
-                // Note: Si la classe existe dans les mocks mais pas l'étudiant, on check les mocks étudiants
-
                 const validStudentMock = MOCK_STUDENTS_AUTH.find(s => s.pin === pin && s.classCode.toUpperCase() === classCode.toUpperCase());
 
                 if (validStudentMock) {
@@ -72,7 +71,7 @@ export const useAuthStore = create<AuthStore>()(
                 return { success: false, message: "Identifiants incorrects (Classe ou PIN)." };
             },
 
-            loginTeacher: async (email: string, code: string): Promise<any> => {
+            loginTeacher: async (email: string, code: string): Promise<AuthResult> => {
                 const validTeacher = MOCK_TEACHERS.find(t => t.email === email && t.code === code);
                 if (!validTeacher) return { success: false, message: "Identifiants incorrects." };
 

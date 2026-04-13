@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { 
   Search, 
-  ChevronRight, 
   Users, 
   Target,
   GraduationCap,

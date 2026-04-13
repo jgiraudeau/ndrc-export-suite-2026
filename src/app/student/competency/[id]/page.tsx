@@ -9,6 +9,7 @@ import { ALL_COMPETENCIES } from "@/data/competencies";
 import { QUIZZES } from "@/data/quizzes";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import Image from "next/image";
 import confetti from "canvas-confetti";
 
 export default function CompetencyProofPage() {
@@ -140,7 +141,7 @@ export default function CompetencyProofPage() {
             } else {
                 alert(data.error || "Erreur lors de l'envoi de l'image.");
             }
-        } catch (err) {
+        } catch {
             alert("Erreur réseau de connexion au serveur.");
         } finally {
             setIsUploading(false);
@@ -296,9 +297,16 @@ export default function CompetencyProofPage() {
                             {isImageProof && proofInput && (
                                 <div className="mt-3 p-3 bg-white border border-slate-200 shadow-sm rounded-xl">
                                     <div className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1">
-                                        <ImageIcon size={14} /> Aperçu de l'image
+                                        <ImageIcon size={14} /> Aperçu de l&apos;image
                                     </div>
-                                    <img src={proofInput} alt="Preuve" className="max-h-48 rounded-lg object-contain w-full" />
+                                    <Image
+                                        src={proofInput}
+                                        alt="Preuve"
+                                        width={640}
+                                        height={320}
+                                        unoptimized
+                                        className="max-h-48 rounded-lg object-contain w-full"
+                                    />
                                 </div>
                             )}
                             <input type="file" id="upload-proof" accept="image/*" onChange={handleFileUpload} className="hidden" />
@@ -306,7 +314,7 @@ export default function CompetencyProofPage() {
                                 {isUploading ? (
                                     <><Loader2 className="animate-spin text-indigo-500" size={16} /> Upload en cours...</>
                                 ) : (
-                                    <><UploadCloud size={16} className="text-slate-500" /> Uploader une capture d'écran</>
+                                    <><UploadCloud size={16} className="text-slate-500" /> Uploader une capture d&apos;écran</>
                                 )}
                             </label>
                         </div>

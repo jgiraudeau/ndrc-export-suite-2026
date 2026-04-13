@@ -1,15 +1,13 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const connectionString = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL || "";
-const pool = new pg.Pool({ connectionString });
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter } as any);
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
     console.log("--- Diagnostic Professeur ---");
@@ -22,7 +20,7 @@ async function main() {
         if (teachers.length === 0) {
             console.log("Aucun professeur trouvé. Création d'un compte par défaut...");
             const passwordHash = await bcrypt.hash("password123", 10);
-            const newTeacher = await prisma.teacher.create({
+            await prisma.teacher.create({
                 data: {
                     name: "Professeur Test",
                     email: "prof@test.com",
@@ -45,5 +43,4 @@ main()
     .catch(e => console.error(e))
     .finally(async () => {
         await prisma.$disconnect();
-        await pool.end();
     });
