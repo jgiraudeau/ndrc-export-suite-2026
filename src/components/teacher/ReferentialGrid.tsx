@@ -1,18 +1,26 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { 
   ChevronDown, 
   ChevronUp, 
   Save, 
   Loader2,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
+  Sparkle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiGradeCompetency, apiValidateEvaluation, apiFetch } from "@/lib/api-client";
-import { ShieldCheck, Sparkle } from "lucide-react";
+import {
+  apiFetch,
+  apiGetEvaluationDraft,
+  apiGradeCompetency,
+  apiSaveEvaluationDraft,
+  apiValidateEvaluation,
+  type EvaluationKind,
+} from "@/lib/api-client";
 
 interface CompetencyChild {
   description: string;
@@ -52,10 +60,26 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [currentGrades, setCurrentGrades] = useState<Record<string, number>>(initialGrades);
   const [dirtyCodes, setDirtyCodes] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [isValidated, setIsValidated] = useState(initialIsValidated);
-  const [validatedAt, setValidatedAt] = useState<string | null>(initialValidatedAt);
+  const [evaluationKind, setEvaluationKind] = useState<EvaluationKind>("FORMATIVE");
+  const [draftGradesByKind, setDraftGradesByKind] = useState<Record<"PREPARATOIRE" | "CCF", Record<string, number>>>({
+    PREPARATOIRE: {},
+    CCF: {},
+  });
+  const [draftLoadedByKind, setDraftLoadedByKind] = useState<Record<"PREPARATOIRE" | "CCF", boolean>>({
+    PREPARATOIRE: false,
+    CCF: false,
+  });
+  const [validationByKind, setValidationByKind] = useState<Record<EvaluationKind, { isValidated: boolean; validatedAt: string | null }>>({
+    FORMATIVE: { isValidated: false, validatedAt: null },
+    PREPARATOIRE: { isValidated: false, validatedAt: null },
+    CCF: { isValidated: initialIsValidated, validatedAt: initialValidatedAt },
+  });
+  const [loadingKindData, setLoadingKindData] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [aiSuggesting, setAiSuggesting] = useState<string | null>(null);
+
+  const isValidated = validationByKind[evaluationKind].isValidated;
+  const validatedAt = validationByKind[evaluationKind].validatedAt;
 
   const handleAiDiagnosis = async (code: string) => {
     setAiSuggesting(code);
@@ -89,8 +113,57 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     { value: 4, label: "Très satisfaisant", color: "bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100" },
   ];
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncKindData() {
+      if (evaluationKind === "FORMATIVE") {
+        setCurrentGrades(initialGrades);
+        return;
+      }
+
+      if (!type) return;
+
+      if (draftLoadedByKind[evaluationKind]) {
+        setCurrentGrades(draftGradesByKind[evaluationKind] || {});
+        return;
+      }
+
+      setLoadingKindData(true);
+      const { data } = await apiGetEvaluationDraft(studentId, type, evaluationKind);
+      if (cancelled) return;
+
+      setLoadingKindData(false);
+
+      if (!data) return;
+
+      setCurrentGrades(data.grades || {});
+      setDraftGradesByKind((prev) => ({
+        ...prev,
+        [evaluationKind]: data.grades || {},
+      }));
+      setDraftLoadedByKind((prev) => ({
+        ...prev,
+        [evaluationKind]: true,
+      }));
+      setValidationByKind((prev) => ({
+        ...prev,
+        [evaluationKind]: {
+          isValidated: data.isValidated,
+          validatedAt: data.validatedAt,
+        },
+      }));
+    }
+
+    void syncKindData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draftGradesByKind, draftLoadedByKind, evaluationKind, initialGrades, studentId, type]);
+
   const handleGradeLocal = (competencyCode: string, childIdx: number, grade: number) => {
-    if (readOnly) return;
+    if (isReadOnly) return;
     const key = `${competencyCode}_${childIdx}`;
     setCurrentGrades(prev => ({ ...prev, [key]: grade }));
     setDirtyCodes(prev => new Set(prev).add(competencyCode));
@@ -106,17 +179,48 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     
     // Mocking a sequential save for all modified children in this block
     const competency = referential.find(c => c.code === competencyCode);
-    if (!competency) return;
+    if (!competency) {
+      setSavingId(null);
+      return;
+    }
 
     try {
-      for (let i = 0; i < competency.children.length; i++) {
-        const key = `${competencyCode}_${i}`;
-        const grade = currentGrades[key];
-        if (grade) {
-          await apiGradeCompetency(studentId, key, grade, `Évaluation ${type}`);
+      if (evaluationKind === "FORMATIVE") {
+        for (let i = 0; i < competency.children.length; i++) {
+          const key = `${competencyCode}_${i}`;
+          const grade = currentGrades[key];
+          if (grade) {
+            await apiGradeCompetency(studentId, key, grade, `Évaluation ${type}`);
+          }
+        }
+      } else if (type) {
+        const gradesToPersist: Record<string, number> = {};
+
+        for (const [key, grade] of Object.entries(currentGrades)) {
+          if (typeof grade === "number" && grade >= 1 && grade <= 4) {
+            gradesToPersist[key] = grade;
+          }
+        }
+
+        const { error } = await apiSaveEvaluationDraft(
+          studentId,
+          type,
+          evaluationKind,
+          gradesToPersist
+        );
+        if (!error) {
+          setDraftGradesByKind((prev) => ({
+            ...prev,
+            [evaluationKind]: gradesToPersist,
+          }));
+          setDraftLoadedByKind((prev) => ({
+            ...prev,
+            [evaluationKind]: true,
+          }));
         }
       }
-      setDirtyCodes(prev => {
+
+      setDirtyCodes((prev) => {
         const next = new Set(prev);
         next.delete(competencyCode);
         return next;
@@ -139,10 +243,15 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     setIsValidating(true);
     try {
       const nextState = !isValidated;
-      const res = await apiValidateEvaluation(studentId, type, nextState);
+      const res = await apiValidateEvaluation(studentId, type, nextState, evaluationKind);
       if (res && !res.error) {
-        setIsValidated(nextState);
-        setValidatedAt(nextState ? new Date().toISOString() : null);
+        setValidationByKind((prev) => ({
+          ...prev,
+          [evaluationKind]: {
+            isValidated: nextState,
+            validatedAt: nextState ? new Date().toISOString() : null,
+          },
+        }));
       }
     } catch (err) {
       console.error("Failed to validate evaluation", err);
@@ -161,6 +270,55 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
             <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200">
                 <AlertCircle size={14} /> Référentiel Officiel {type}
             </div>
+        </div>
+      )}
+
+      {!readOnly && type && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 md:p-6 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">
+              Type d&apos;évaluation
+            </h3>
+            {loadingKindData && (
+              <span className="inline-flex items-center gap-2 text-xs font-bold text-slate-500">
+                <Loader2 size={14} className="animate-spin" />
+                Chargement...
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {[
+              { value: "FORMATIVE", label: "Formative", note: "Visible étudiant" },
+              { value: "PREPARATOIRE", label: "Préparatoire", note: "Examen blanc" },
+              { value: "CCF", label: "Certificative (CCF)", note: "Confidentiel étudiant" },
+            ].map((item) => (
+              <button
+                key={item.value}
+                onClick={() => {
+                  setEvaluationKind(item.value as EvaluationKind);
+                  setDirtyCodes(new Set());
+                }}
+                className={cn(
+                  "p-3 rounded-xl border text-left transition-all",
+                  evaluationKind === item.value
+                    ? "bg-purple-50 border-purple-200 shadow-sm"
+                    : "bg-white border-slate-200 hover:border-slate-300"
+                )}
+              >
+                <p
+                  className={cn(
+                    "text-sm font-black",
+                    evaluationKind === item.value ? "text-purple-700" : "text-slate-700"
+                  )}
+                >
+                  {item.label}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">
+                  {item.note}
+                </p>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -191,7 +349,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                 </div>
               </div>
                 <div className="flex items-center gap-4">
-                {!readOnly && (
+                {!isReadOnly && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleAiDiagnosis(comp.code); }}
                         disabled={aiSuggesting === comp.code}
@@ -245,14 +403,14 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                     <button
                                       key={level.value}
                                       onClick={() => handleGradeLocal(comp.code, idx, level.value)}
-                                      disabled={readOnly}
+                                      disabled={isReadOnly}
                                       className={cn(
                                         "flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all h-20 text-center",
                                         isActive 
                                           ? "ring-2 ring-purple-100 border-purple-300 " + level.color
                                           : "bg-slate-50/50 border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600",
-                                        readOnly && !isActive && "opacity-30 grayscale cursor-not-allowed",
-                                        readOnly && isActive && "cursor-default"
+                                        isReadOnly && !isActive && "opacity-30 grayscale cursor-not-allowed",
+                                        isReadOnly && isActive && "cursor-default"
                                       )}
                                     >
                                     <span className="text-[10px] font-black uppercase tracking-tight leading-none">{level.label}</span>
@@ -265,7 +423,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                       );
                     })}
 
-                    {isDirty && !readOnly && (
+                    {isDirty && !isReadOnly && (
                       <div className="flex justify-end pt-4 border-t border-slate-100">
                         <button 
                             onClick={() => handleSaveCompetency(comp.code)}
@@ -286,7 +444,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       })}
 
       {/* ── Certification Zone ───────────────────────────────── */}
-      {!readOnly && type && (
+      {!readOnly && type && evaluationKind === "CCF" && (
         <div className={cn(
             "mt-12 p-10 rounded-[40px] border-2 transition-all duration-500",
             isValidated 

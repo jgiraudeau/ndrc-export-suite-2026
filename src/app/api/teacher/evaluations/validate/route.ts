@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, extractToken } from "@/lib/jwt";
+import {
+    buildEvaluationType,
+    evaluationKindLabel,
+    isExamType,
+    normalizeEvaluationKind,
+} from "@/lib/evaluation-types";
 
 export async function POST(req: NextRequest) {
     try {
@@ -12,18 +18,29 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
         }
 
-        const { studentId, type, isValidated } = await req.json();
+        const { studentId, type, isValidated, evaluationKind } = await req.json();
 
         if (!studentId || !type) {
             return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
         }
 
-        // 1. Trouver ou créer l'évaluation de ce type pour cet étudiant
-        // On cherche une évaluation de type 'official' pour le bloc concerné (E4 ou E6)
+        const normalizedType = typeof type === "string" ? type.toUpperCase() : "";
+        if (!isExamType(normalizedType)) {
+            return NextResponse.json({ error: "Type d'épreuve invalide (E4/E6 attendu)" }, { status: 400 });
+        }
+
+        const normalizedKind = normalizeEvaluationKind(
+            typeof evaluationKind === "string" ? evaluationKind : undefined
+        );
+        const evaluationType = buildEvaluationType(normalizedType, normalizedKind);
+
         const evaluation = await prisma.evaluation.findFirst({
             where: {
                 studentId,
-                type: type.toUpperCase(), // ex: "E4" ou "E6"
+                OR: [
+                    { type: evaluationType },
+                    ...(normalizedKind === "CCF" ? [{ type: normalizedType }] : []),
+                ],
             }
         });
 
@@ -31,6 +48,8 @@ export async function POST(req: NextRequest) {
             await prisma.evaluation.update({
                 where: { id: evaluation.id },
                 data: {
+                    type: evaluationType,
+                    situation: `Évaluation ${normalizedType} — ${evaluationKindLabel(normalizedKind)}`,
                     isValidated,
                     validatedAt: isValidated ? new Date() : null,
                     evaluatorId: payload.sub
@@ -42,8 +61,8 @@ export async function POST(req: NextRequest) {
                 data: {
                     studentId,
                     evaluatorId: payload.sub,
-                    type: type.toUpperCase(),
-                    situation: "Dossier Officiel",
+                    type: evaluationType,
+                    situation: `Évaluation ${normalizedType} — ${evaluationKindLabel(normalizedKind)}`,
                     date: new Date(),
                     isValidated,
                     validatedAt: isValidated ? new Date() : null,
@@ -51,7 +70,7 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        return NextResponse.json({ success: true, isValidated });
+        return NextResponse.json({ success: true, isValidated, evaluationKind: normalizedKind });
     } catch (error) {
         console.error("Erreur validation numérique:", error);
         return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

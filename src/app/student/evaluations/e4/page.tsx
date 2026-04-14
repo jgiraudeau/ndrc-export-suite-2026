@@ -6,13 +6,27 @@ import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 type StudentEvaluation = {
-    type: string;
+    examType: "E4" | "E6";
+    evaluationKind: "FORMATIVE" | "PREPARATOIRE";
     isValidated: boolean;
     validatedAt?: string | null;
+    date: string;
+    situation: string;
+    globalComment?: string | null;
 };
 
 type EvaluationResponse = {
     evaluations?: StudentEvaluation[];
+    certifications?: {
+        E4?: {
+            isValidated: boolean;
+            validatedAt?: string | null;
+        };
+        E6?: {
+            isValidated: boolean;
+            validatedAt?: string | null;
+        };
+    };
 };
 
 type StudentProfileData = {
@@ -28,16 +42,22 @@ type StudentProfileResponse = {
 
 export default function StudentE4Page() {
     const [loading, setLoading] = useState(true);
-    const [evaluation, setEvaluation] = useState<StudentEvaluation | null>(null);
+    const [visibleEvaluations, setVisibleEvaluations] = useState<StudentEvaluation[]>([]);
+    const [certification, setCertification] = useState<{
+        isValidated: boolean;
+        validatedAt?: string | null;
+    } | null>(null);
     const [studentData, setStudentData] = useState<StudentProfileData | null>(null);
 
     useEffect(() => {
         const fetchGrades = async () => {
             // Fetch Evaluation Status
             const resEval = await apiFetch<EvaluationResponse>("/api/student/evaluations");
-            if (resEval.data?.evaluations) {
-                const e4Eval = resEval.data.evaluations.find((e) => e.type === "E4") || null;
-                setEvaluation(e4Eval);
+            if (resEval.data) {
+                setVisibleEvaluations(
+                    (resEval.data.evaluations || []).filter((e) => e.examType === "E4")
+                );
+                setCertification(resEval.data.certifications?.E4 || null);
             }
 
             // Fetch Student Name for PDF
@@ -48,6 +68,14 @@ export default function StudentE4Page() {
         };
         fetchGrades();
     }, []);
+
+    const latestFormative = visibleEvaluations
+        .filter((evaluation) => evaluation.evaluationKind === "FORMATIVE")
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] || null;
+
+    const latestPreparatoire = visibleEvaluations
+        .filter((evaluation) => evaluation.evaluationKind === "PREPARATOIRE")
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] || null;
 
     if (loading) {
         return (
@@ -77,14 +105,14 @@ export default function StudentE4Page() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
                 <div className={cn(
                     "p-6 rounded-[24px] border flex items-center justify-between gap-4 transition-all",
-                    evaluation?.isValidated 
+                    certification?.isValidated 
                         ? "bg-emerald-50 border-emerald-100 text-emerald-900" 
                         : "bg-slate-50 border-slate-200 text-slate-500"
                 )}>
                     <div className="flex items-center gap-4">
                         <div className={cn(
                             "w-12 h-12 rounded-2xl flex items-center justify-center",
-                            evaluation?.isValidated ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-slate-200 text-slate-400"
+                            certification?.isValidated ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200" : "bg-slate-200 text-slate-400"
                         )}>
                             <ShieldCheck size={24} />
                         </div>
@@ -93,13 +121,13 @@ export default function StudentE4Page() {
                                 Certification Numérique
                             </div>
                             <div className="font-black text-lg">
-                                {evaluation?.isValidated ? "Dossier Validé" : "En attente de validation"}
+                                {certification?.isValidated ? "Dossier Validé" : "En attente de validation"}
                             </div>
                         </div>
                     </div>
-                    {evaluation?.isValidated && (
+                    {certification?.isValidated && (
                          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-lg text-[10px] font-black uppercase tracking-tighter text-emerald-700 border border-emerald-200">
-                            LE {evaluation.validatedAt ? new Date(evaluation.validatedAt).toLocaleDateString() : "N/A"}
+                            LE {certification.validatedAt ? new Date(certification.validatedAt).toLocaleDateString() : "N/A"}
                         </div>
                     )}
                 </div>
@@ -148,26 +176,34 @@ export default function StudentE4Page() {
                         </div>
                         <div className="space-y-4">
                             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500" style={{ width: '45%' }} />
+                                <div className="h-full bg-blue-500" style={{ width: latestFormative ? "65%" : "35%" }} />
                             </div>
-                            <p className="text-xs text-slate-500 italic">Vos compétences de base ont été identifiées. Focus sur la prospection digitale.</p>
+                            <p className="text-xs text-slate-500 italic">
+                                {latestFormative
+                                    ? "Une evaluation formative E4 est disponible dans votre suivi pedagogique."
+                                    : "Aucune evaluation formative E4 enregistree pour le moment."}
+                            </p>
                         </div>
                     </div>
 
-                    {/* Évaluation Formative */}
+                    {/* Évaluation Préparatoire */}
                     <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all ring-2 ring-indigo-50">
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black">F</div>
+                            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black">P</div>
                             <div>
-                                <h3 className="font-bold text-slate-800 text-lg">Missions en Entreprise</h3>
-                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">FORMATIVE</p>
+                                <h3 className="font-bold text-slate-800 text-lg">Simulation d&apos;Epreuve</h3>
+                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">PREPARATOIRE</p>
                             </div>
                         </div>
                         <div className="space-y-4">
                             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-500" style={{ width: '75%' }} />
+                                <div className="h-full bg-indigo-500" style={{ width: latestPreparatoire ? "70%" : "25%" }} />
                             </div>
-                            <p className="text-xs text-slate-500 italic">Excellent retour sur la dernière mission de négociation-vente.</p>
+                            <p className="text-xs text-slate-500 italic">
+                                {latestPreparatoire
+                                    ? "Une evaluation preparatoire E4 est disponible (entrainement avant CCF)."
+                                    : "Aucune evaluation preparatoire E4 enregistree pour le moment."}
+                            </p>
                         </div>
                     </div>
                 </div>

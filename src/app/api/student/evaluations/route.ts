@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, extractToken } from "@/lib/jwt";
+import { parseEvaluationType, type ExamType } from "@/lib/evaluation-types";
+
+type StudentVisibleEvaluation = {
+    id: string;
+    examType: ExamType;
+    evaluationKind: "FORMATIVE" | "PREPARATOIRE";
+    isValidated: boolean;
+    validatedAt?: string | null;
+    date: string;
+    situation: string;
+    globalComment: string | null;
+};
+
+type CertificationSummary = {
+    isValidated: boolean;
+    validatedAt: string | null;
+};
 
 export async function GET(req: NextRequest) {
     try {
@@ -12,7 +29,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
         }
 
-        const evaluations = await prisma.evaluation.findMany({
+        const rawEvaluations = await prisma.evaluation.findMany({
             where: { studentId: payload.sub },
             include: {
                 evaluator: { select: { name: true } },
@@ -26,7 +43,43 @@ export async function GET(req: NextRequest) {
             }
         });
 
-        return NextResponse.json({ evaluations });
+        const certifications: Record<ExamType, CertificationSummary> = {
+            E4: { isValidated: false, validatedAt: null },
+            E6: { isValidated: false, validatedAt: null },
+        };
+
+        const evaluations: StudentVisibleEvaluation[] = [];
+
+        for (const evaluation of rawEvaluations) {
+            const parsed = parseEvaluationType(evaluation.type);
+            if (!parsed.examType || !parsed.evaluationKind) continue;
+
+            if (parsed.evaluationKind === "CCF") {
+                const current = certifications[parsed.examType];
+                const currentDate = current.validatedAt ? new Date(current.validatedAt).getTime() : 0;
+                const nextDate = evaluation.validatedAt ? evaluation.validatedAt.getTime() : 0;
+                if (nextDate >= currentDate) {
+                    certifications[parsed.examType] = {
+                        isValidated: Boolean(evaluation.isValidated),
+                        validatedAt: evaluation.validatedAt?.toISOString() ?? null,
+                    };
+                }
+                continue;
+            }
+
+            evaluations.push({
+                id: evaluation.id,
+                examType: parsed.examType,
+                evaluationKind: parsed.evaluationKind,
+                isValidated: Boolean(evaluation.isValidated),
+                validatedAt: evaluation.validatedAt?.toISOString() ?? null,
+                date: evaluation.date.toISOString(),
+                situation: evaluation.situation,
+                globalComment: evaluation.globalComment,
+            });
+        }
+
+        return NextResponse.json({ evaluations, certifications });
     } catch (error) {
         console.error("Erreur récup evaluations student:", error);
         return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

@@ -41,16 +41,24 @@ export default function StudentDetailPage() {
     const [loading, setLoading] = useState(true);
     
     const [activeTab, setActiveTab] = useState<"DIGITAL" | "E4" | "E6">("DIGITAL");
+    const lockedExamTab = useMemo(() => {
+        const tab = searchParams.get("tab");
+        if (tab === "E4" || tab === "E6") return tab;
+        return null;
+    }, [searchParams]);
 
     // Surveiller les changements d'onglets via URL
     useEffect(() => {
+        if (lockedExamTab) {
+            setActiveTab(lockedExamTab);
+            return;
+        }
+
         const tab = searchParams.get("tab");
-        if (tab === "E4" || tab === "E6") {
-            setActiveTab(tab);
-        } else if (tab === "DIGITAL") {
+        if (tab === "DIGITAL") {
             setActiveTab("DIGITAL");
         }
-    }, [searchParams]);
+    }, [lockedExamTab, searchParams]);
 
     // Filtres
     const [platformFilter] = useState<PlatformFilter>("ALL");
@@ -277,6 +285,8 @@ export default function StudentDetailPage() {
     }
 
     const progress = TOTAL_COMPETENCIES > 0 ? Math.round((student.acquiredCount / TOTAL_COMPETENCIES) * 100) : 0;
+    const showDigitalLinks = !lockedExamTab || activeTab === "DIGITAL";
+    const showTabSelector = !lockedExamTab;
 
     return (
         <TeacherLayout>
@@ -300,14 +310,16 @@ export default function StudentDetailPage() {
                                 <span className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide">
                                     <User size={14} /> ID: {student.identifier}
                                 </span>
-                                <div className="flex gap-2">
-                                    {student.wpUrl && (
-                                        <a href={student.wpUrl} target="_blank" rel="noopener noreferrer" className="p-1 px-3 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors">CMS</a>
-                                    )}
-                                    {student.prestaUrl && (
-                                        <a href={student.prestaUrl} target="_blank" rel="noopener noreferrer" className="p-1 px-3 bg-pink-50 text-pink-600 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-pink-100 transition-colors">BO</a>
-                                    )}
-                                </div>
+                                {showDigitalLinks && (
+                                    <div className="flex gap-2">
+                                        {student.wpUrl && (
+                                            <a href={student.wpUrl} target="_blank" rel="noopener noreferrer" className="p-1 px-3 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors">WordPress</a>
+                                        )}
+                                        {student.prestaUrl && (
+                                            <a href={student.prestaUrl} target="_blank" rel="noopener noreferrer" className="p-1 px-3 bg-pink-50 text-pink-600 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-pink-100 transition-colors">PrestaShop</a>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -374,35 +386,49 @@ export default function StudentDetailPage() {
                 </div>
 
                 {/* Tabs Selection */}
-                <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
-                    <button
-                        onClick={() => {
-                            setActiveTab("DIGITAL");
-                            router.replace(`/teacher/student/${studentId}?tab=DIGITAL`);
-                        }}
-                        className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "DIGITAL" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-                    >
-                        Compétences Digitales
-                    </button>
-                    <button
-                        onClick={() => {
-                            setActiveTab("E4");
-                            router.replace(`/teacher/student/${studentId}?tab=E4`);
-                        }}
-                        className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "E4" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-                    >
-                        Épreuve E4
-                    </button>
-                    <button
-                        onClick={() => {
-                            setActiveTab("E6");
-                            router.replace(`/teacher/student/${studentId}?tab=E6`);
-                        }}
-                        className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "E6" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-                    >
-                        Épreuve E6
-                    </button>
-                </div>
+                {showTabSelector ? (
+                    <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
+                        <button
+                            onClick={() => {
+                                setActiveTab("DIGITAL");
+                                router.replace(`/teacher/student/${studentId}?tab=DIGITAL`);
+                            }}
+                            className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "DIGITAL" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                        >
+                            Compétences Digitales
+                        </button>
+                        <button
+                            onClick={() => {
+                                setActiveTab("E4");
+                                router.replace(`/teacher/student/${studentId}?tab=E4`);
+                            }}
+                            className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "E4" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                        >
+                            Épreuve E4
+                        </button>
+                        <button
+                            onClick={() => {
+                                setActiveTab("E6");
+                                router.replace(`/teacher/student/${studentId}?tab=E6`);
+                            }}
+                            className={cn("px-8 py-3 text-sm font-black rounded-xl transition-all border-0", activeTab === "E6" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+                        >
+                            Épreuve E6
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-3">
+                        <span className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-black uppercase tracking-widest border border-purple-100">
+                            Vue dédiée {activeTab}
+                        </span>
+                        <Link
+                            href={`/teacher/evaluations/${activeTab.toLowerCase()}`}
+                            className="text-xs font-bold text-slate-500 hover:text-purple-700 transition-colors"
+                        >
+                            Retour à la liste {activeTab}
+                        </Link>
+                    </div>
+                )}
 
                 {/* Content based on Tab */}
                 {activeTab === "DIGITAL" ? (

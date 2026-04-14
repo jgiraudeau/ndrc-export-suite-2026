@@ -450,9 +450,55 @@ export async function apiGetJournal(params: { experienceId?: string; assignmentI
 /**
  * Valide numériquement une évaluation (E4/E6)
  */
-export async function apiValidateEvaluation(studentId: string, type: string, isValidated: boolean = true) {
+export type EvaluationKind = "FORMATIVE" | "PREPARATOIRE" | "CCF";
+
+export async function apiValidateEvaluation(
+    studentId: string,
+    type: string,
+    isValidated: boolean = true,
+    evaluationKind: EvaluationKind = "CCF"
+) {
     return apiFetch<{ success: boolean }>("/api/teacher/evaluations/validate", {
         method: "POST",
-        body: JSON.stringify({ studentId, type, isValidated }),
+        body: JSON.stringify({ studentId, type, isValidated, evaluationKind }),
+    });
+}
+
+export async function apiGetEvaluationDraft(
+    studentId: string,
+    examType: "E4" | "E6",
+    evaluationKind: EvaluationKind
+) {
+    const query = new URLSearchParams({
+        studentId,
+        examType,
+        evaluationKind,
+    });
+
+    return apiFetch<{
+        studentId: string;
+        examType: "E4" | "E6";
+        evaluationKind: EvaluationKind;
+        grades: Record<string, number>;
+        isValidated: boolean;
+        validatedAt: string | null;
+    }>(`/api/teacher/evaluations/draft?${query.toString()}`);
+}
+
+export async function apiSaveEvaluationDraft(
+    studentId: string,
+    examType: "E4" | "E6",
+    evaluationKind: EvaluationKind,
+    grades: Record<string, number>
+) {
+    return apiFetch<{
+        success: boolean;
+        studentId: string;
+        examType: "E4" | "E6";
+        evaluationKind: EvaluationKind;
+        gradesCount: number;
+    }>("/api/teacher/evaluations/draft", {
+        method: "POST",
+        body: JSON.stringify({ studentId, examType, evaluationKind, grades }),
     });
 }
