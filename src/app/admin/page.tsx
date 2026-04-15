@@ -11,7 +11,7 @@ type StatusFilter = "all" | "pending" | "active" | "rejected";
 export default function AdminDashboardPage() {
     const router = useRouter();
     const whmManagerUrl =
-        process.env.NEXT_PUBLIC_WHM_MANAGER_URL || "https://whm-manager.vercel.app";
+        process.env.NEXT_PUBLIC_WHM_MANAGER_URL || "https://whm-manager-production.up.railway.app";
     const [teachers, setTeachers] = useState<TeacherAdmin[]>([]);
     const [stats, setStats] = useState<AdminStats | null>(null);
     const [filter, setFilter] = useState<StatusFilter>("all");

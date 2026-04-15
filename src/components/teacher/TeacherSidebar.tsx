@@ -23,7 +23,7 @@ export function TeacherSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const whmManagerUrl =
-    process.env.NEXT_PUBLIC_WHM_MANAGER_URL || "https://whm-manager.vercel.app";
+    process.env.NEXT_PUBLIC_WHM_MANAGER_URL || "https://whm-manager-production.up.railway.app";
 
   const handleLogout = () => {
     localStorage.removeItem("ndrc_token");
