@@ -1,25 +1,412 @@
 "use client";
-export default function Page() {
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import {
+  ArrowLeft,
+  Sparkles,
+  Loader2,
+  Target,
+  Save,
+  CheckCircle2,
+  BookOpen,
+  RefreshCw,
+  ChevronRight,
+} from "lucide-react";
+import { TeacherLayout } from "@/components/layout/TeacherLayout";
+import { ALL_COMPETENCIES } from "@/data/competencies";
+import { cn } from "@/lib/utils";
+
+type Platform = "WORDPRESS" | "PRESTASHOP";
+type Level = 1 | 2 | 3 | 4;
+
+interface GeneratedMission {
+  text: string;
+  competencyIds: string[];
+}
+
+export default function TeacherMissionGeneratePage() {
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>("WORDPRESS");
+  const [selectedLevel, setSelectedLevel] = useState<Level>(2);
+  const [selectedCategory, setSelectedCategory] = useState<string>("Toutes");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedContext, setSelectedContext] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
+
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [generatedMission, setGeneratedMission] = useState<GeneratedMission | null>(null);
+  const [savedMissionId, setSavedMissionId] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
+
+  const platformCompetencies = useMemo(
+    () => ALL_COMPETENCIES.filter((c) => c.platform === selectedPlatform),
+    [selectedPlatform]
+  );
+  const categories = useMemo(
+    () => ["Toutes", ...Array.from(new Set(platformCompetencies.map((c) => c.category)))],
+    [platformCompetencies]
+  );
+
+  const displayCompetencies = useMemo(
+    () =>
+      platformCompetencies.filter(
+        (c) => selectedCategory === "Toutes" || c.category === selectedCategory
+      ),
+    [platformCompetencies, selectedCategory]
+  );
+
+  const resetSelectionForPlatform = (nextPlatform: Platform) => {
+    setSelectedPlatform(nextPlatform);
+    setSelectedIds([]);
+    setSelectedCategory("Toutes");
+    setGeneratedMission(null);
+    setSavedMissionId(null);
+    setJustSaved(false);
+    setErrorMsg("");
+  };
+
+  const toggleCompetency = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const handleGenerate = async () => {
+    if (selectedIds.length === 0) {
+      setErrorMsg("Sélectionne au moins une compétence.");
+      return;
+    }
+
+    setGenerating(true);
+    setErrorMsg("");
+    setGeneratedMission(null);
+    setSavedMissionId(null);
+    setJustSaved(false);
+
+    try {
+      const token = localStorage.getItem("ndrc_token");
+      const res = await fetch("/api/missions/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          competencyIds: selectedIds,
+          context: selectedContext,
+          level: selectedLevel,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de génération");
+
+      const missionText = data?.mission || data?.data?.mission;
+      if (!missionText || typeof missionText !== "string") {
+        throw new Error("Réponse IA invalide");
+      }
+
+      setGeneratedMission({
+        text: missionText,
+        competencyIds: [...selectedIds],
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la génération.";
+      setErrorMsg(message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSaveMission = async () => {
+    if (!generatedMission) return;
+
+    setSaving(true);
+    setErrorMsg("");
+
+    try {
+      const token = localStorage.getItem("ndrc_token");
+      const fallbackTitle = `Épreuve E5B ${selectedPlatform} Niv.${selectedLevel} — ${new Date().toLocaleDateString(
+        "fr-FR"
+      )}`;
+      const title = customTitle.trim() || fallbackTitle;
+
+      const res = await fetch("/api/missions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title,
+          content: generatedMission.text,
+          platform: selectedPlatform,
+          level: selectedLevel,
+          competencyIds: generatedMission.competencyIds,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de l'enregistrement");
+
+      const missionId = data?.id || data?.data?.id || null;
+      setSavedMissionId(missionId);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2500);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de l'enregistrement.";
+      setErrorMsg(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <>
-      <style>{`
-.material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-      `}</style>
-      <div dangerouslySetInnerHTML={{ __html: '<!-- SideNavBar -->\n<aside class="fixed left-0 top-0 bottom-0 w-64 z-50 bg-zinc-50 dark:bg-zinc-900 flex flex-col py-8 px-4 h-full font-manrope text-sm">\n<div class="mb-10 px-2 flex items-center gap-3">\n<div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-on-primary">\n<span class="material-symbols-outlined">school</span>\n</div>\n<div>\n<h1 class="text-lg font-extrabold text-zinc-900 dark:text-zinc-100 leading-none">Academic Curator</h1>\n<p class="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Teacher Portal</p>\n</div>\n</div>\n<nav class="flex-1 space-y-2">\n<a class="flex items-center gap-3 px-4 py-3 text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">\n<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>\n<span>Dashboard</span>\n</a>\n<a class="flex items-center gap-3 px-4 py-3 text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">\n<span class="material-symbols-outlined" data-icon="group">group</span>\n<span>My Students</span>\n</a>\n<!-- Active Tab: AI Mission Gen -->\n<a class="flex items-center gap-3 px-4 py-3 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 rounded-lg translate-x-1 font-semibold cursor-pointer" href="#">\n<span class="material-symbols-outlined" data-icon="psychology">psychology</span>\n<span>AI Mission Gen</span>\n</a>\n<a class="flex items-center gap-3 px-4 py-3 text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">\n<span class="material-symbols-outlined" data-icon="assignment_turned_in">assignment_turned_in</span>\n<span>E4 Evaluations</span>\n</a>\n<a class="flex items-center gap-3 px-4 py-3 text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">\n<span class="material-symbols-outlined" data-icon="verified">verified</span>\n<span>E6 Evaluations</span>\n</a>\n<a class="flex items-center gap-3 px-4 py-3 text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:translate-x-1 transition-transform duration-200 cursor-pointer" href="#">\n<span class="material-symbols-outlined" data-icon="settings">settings</span>\n<span>Settings</span>\n</a>\n</nav>\n<div class="mt-auto space-y-1 pt-6 border-t border-zinc-200 dark:border-zinc-800">\n<a class="flex items-center gap-3 px-4 py-2 text-zinc-500 hover:text-indigo-600 transition-colors" href="#">\n<span class="material-symbols-outlined" data-icon="contact_support">contact_support</span>\n<span>Help Center</span>\n</a>\n<a class="flex items-center gap-3 px-4 py-2 text-zinc-500 hover:text-error transition-colors" href="#">\n<span class="material-symbols-outlined" data-icon="logout">logout</span>\n<span>Logout</span>\n</a>\n</div>\n</aside>\n<!-- TopNavBar -->\n<header class="fixed top-0 right-0 left-0 z-40 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex justify-between items-center h-16 px-8 ml-64 shadow-sm dark:shadow-none">\n<div class="flex items-center gap-8">\n<span class="text-xl font-bold tracking-tight text-indigo-700 dark:text-indigo-300 font-headline">BTS NDRC Portal</span>\n<div class="relative group">\n<span class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant material-symbols-outlined text-lg" data-icon="search">search</span>\n<input class="bg-surface-container-high rounded-full pl-10 pr-4 py-1.5 text-sm border-none focus:ring-2 focus:ring-primary/20 w-64 transition-all duration-300" placeholder="Rechercher une mission..." type="text"/>\n</div>\n</div>\n<div class="flex items-center gap-4">\n<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-100 transition-colors relative">\n<span class="material-symbols-outlined text-zinc-600" data-icon="notifications">notifications</span>\n<span class="absolute top-2.5 right-2.5 w-2 h-2 bg-error rounded-full border-2 border-white"></span>\n</button>\n<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-100 transition-colors">\n<span class="material-symbols-outlined text-zinc-600" data-icon="help_outline">help_outline</span>\n</button>\n<div class="h-8 w-[1px] bg-zinc-200 mx-2"></div>\n<div class="flex items-center gap-3 pl-2">\n<div class="text-right">\n<p class="text-xs font-bold text-on-surface">M. Durand</p>\n<p class="text-[10px] text-on-surface-variant">Professeur Principal</p>\n</div>\n<img alt="Teacher Profile" class="w-9 h-9 rounded-full object-cover ring-2 ring-primary/10" data-alt="Close-up portrait of a professional male teacher in a bright modern office setting, friendly expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4WeeC5n25PHi30GwJRbQCpoPxKcYybAo5iyxJweqITTD_NEyhHbIgP_had7YE5HW54gYzuKNPzChJmjdOaoHFqx5U9pYNjFn1FnauKuK7gkmsD_qD89k_tUddivitG6QtW251OWBsS4VyPao86HS7wkK4gbcbMJIoM0sXpuEIza7qu715-AEwHQrrWvLdu5zKiGjv9wTKVfDB7Qy9pJ9ZVm8l1kZBH7KYNBQV5BZXLG2fqvabZqcgpGJubwBShpaomGtV_8iOzLA"/>\n</div>\n</div>\n</header>\n<!-- Main Content -->\n<main class="ml-64 pt-24 pb-12 px-8 min-h-screen">\n<div class="max-w-7xl mx-auto">\n<!-- Page Header -->\n<div class="mb-10">\n<nav class="flex items-center gap-2 text-xs text-on-surface-variant mb-4 font-label tracking-wider uppercase">\n<span class="hover:text-primary cursor-pointer transition-colors">Dashboard</span>\n<span class="material-symbols-outlined text-[10px]">chevron_right</span>\n<span class="text-primary font-bold">Générateur de Missions AI</span>\n</nav>\n<h2 class="text-4xl font-extrabold text-on-surface font-headline tracking-tight">AI Mission Generation</h2>\n<p class="text-on-surface-variant mt-2 max-w-2xl leading-relaxed">Personnalisez des missions commerciales immersives pour vos étudiants BTS NDRC. L\'IA génère des contextes métiers réels adaptés aux compétences E4/E6 ciblées.</p>\n</div>\n<!-- Dashboard Grid -->\n<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">\n<!-- Left Column (Configuration) -->\n<section class="lg:col-span-5 space-y-6">\n<div class="bg-surface-container-low p-8 rounded-xl shadow-sm border-none">\n<h3 class="text-lg font-bold text-on-surface mb-6 flex items-center gap-2 font-headline">\n<span class="material-symbols-outlined text-primary" data-icon="tune">tune</span>\n                            Configuration du Scénario\n                        </h3>\n<form class="space-y-6">\n<!-- Student Selection -->\n<div class="space-y-2">\n<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider font-label">Student name</label>\n<div class="relative">\n<select class="w-full bg-surface-container-lowest border-none rounded-xl py-3 px-4 appearance-none focus:ring-2 focus:ring-primary/20 text-on-surface font-medium cursor-pointer">\n<option>Jean Dupont</option>\n<option>Marie Martin</option>\n<option>Lucas Bernard</option>\n<option>Sophie Petit</option>\n</select>\n<span class="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant pointer-events-none">expand_more</span>\n</div>\n</div>\n<!-- Platform Selection -->\n<div class="space-y-2">\n<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider font-label">Platform</label>\n<div class="grid grid-cols-2 p-1.5 bg-surface-container-high rounded-xl">\n<button class="py-2.5 rounded-lg bg-surface-container-lowest text-primary font-bold shadow-sm transition-all text-sm" type="button">WordPress</button>\n<button class="py-2.5 rounded-lg text-on-surface-variant font-medium hover:text-on-surface transition-all text-sm" type="button">PrestaShop</button>\n</div>\n</div>\n<!-- Difficulty Level -->\n<div class="space-y-4">\n<div class="flex justify-between items-end">\n<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider font-label">Difficulty Level</label>\n<span class="text-primary font-bold text-sm bg-primary/10 px-3 py-1 rounded-full">Expert</span>\n</div>\n<input class="w-full h-1.5 bg-surface-variant rounded-full appearance-none cursor-pointer accent-primary" max="4" min="1" type="range" value="4"/>\n<div class="flex justify-between text-[10px] text-on-surface-variant font-medium uppercase tracking-tighter">\n<span>Débutant</span>\n<span>Intermédiaire</span>\n<span>Avancé</span>\n<span>Expert</span>\n</div>\n</div>\n<!-- Target Competencies -->\n<div class="space-y-2">\n<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider font-label">Target Competencies (E4/E6)</label>\n<div class="grid grid-cols-1 gap-2 mt-3">\n<label class="flex items-center gap-3 p-3 bg-surface-container-lowest rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-primary/20">\n<input checked="" class="w-5 h-5 rounded text-primary focus:ring-primary/30 border-outline-variant/30" type="checkbox"/>\n<span class="text-sm font-medium text-on-surface">Ciblage et préparation</span>\n</label>\n<label class="flex items-center gap-3 p-3 bg-surface-container-lowest rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-primary/20">\n<input checked="" class="w-5 h-5 rounded text-primary focus:ring-primary/30 border-outline-variant/30" type="checkbox"/>\n<span class="text-sm font-medium text-on-surface">Négociation Vente</span>\n</label>\n<label class="flex items-center gap-3 p-3 bg-surface-container-lowest rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-primary/20">\n<input class="w-5 h-5 rounded text-primary focus:ring-primary/30 border-outline-variant/30" type="checkbox"/>\n<span class="text-sm font-medium text-on-surface">Accompagnement de la relation client</span>\n</label>\n<label class="flex items-center gap-3 p-3 bg-surface-container-lowest rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent hover:border-primary/20">\n<input class="w-5 h-5 rounded text-primary focus:ring-primary/30 border-outline-variant/30" type="checkbox"/>\n<span class="text-sm font-medium text-on-surface">Organisation et animation d\'événements</span>\n</label>\n</div>\n</div>\n<!-- Action Button -->\n<button class="w-full mt-4 py-4 rounded-xl bg-gradient-to-br from-primary to-primary-dim text-on-primary font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 group" type="button">\n<span class="material-symbols-outlined text-xl transition-transform group-hover:rotate-12">auto_awesome</span>\n                                Générer la mission IA ✨\n                            </button>\n</form>\n</div>\n</section>\n<!-- Right Column (Preview) -->\n<section class="lg:col-span-7 h-full">\n<div class="glass-card rounded-xl shadow-2xl shadow-indigo-500/5 h-full flex flex-col border border-white/40 min-h-[700px]">\n<!-- Card Header -->\n<div class="p-6 border-b border-zinc-100 flex justify-between items-center">\n<div class="flex items-center gap-3">\n<div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">\n<span class="material-symbols-outlined text-primary text-xl" data-icon="visibility">visibility</span>\n</div>\n<h3 class="text-lg font-bold text-on-surface font-headline">Aperçu de la Mission</h3>\n</div>\n<div class="flex items-center gap-2">\n<span class="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded">\n<span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> PRÊT\n                                </span>\n</div>\n</div>\n<!-- Card Content (Markdown-like) -->\n<div class="flex-1 overflow-y-auto p-8 no-scrollbar">\n<div class="prose prose-zinc max-w-none">\n<div class="bg-primary/5 rounded-xl p-6 mb-8 border-l-4 border-primary">\n<h1 class="text-2xl font-extrabold text-indigo-900 font-headline mb-2 uppercase tracking-tight">Vente B2B - Solution SaaS RH</h1>\n<div class="flex gap-4 text-xs text-indigo-600 font-bold tracking-wide">\n<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">person</span> Marie Martin</span>\n<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">bolt</span> Expert</span>\n</div>\n</div>\n<section class="mb-8">\n<h4 class="flex items-center gap-2 text-sm font-extrabold text-on-surface uppercase tracking-widest mb-4">\n<span class="w-1.5 h-6 bg-primary rounded-full"></span> Context\n                                    </h4>\n<p class="text-on-surface-variant leading-relaxed mb-4">\n                                        Vous travaillez pour <strong class="text-on-surface">TalentFlow</strong>, une startup proposant une plateforme SaaS de gestion des talents et du recrutement optimisée par IA. Votre cible est la société <strong>"LogiTrans"</strong>, un leader de la logistique en pleine transformation digitale avec 500 collaborateurs.\n                                    </p>\n<p class="text-on-surface-variant leading-relaxed">\n                                        Votre interlocuteur est M. Leroux, DRH, qui semble réticent au changement mais subit une forte pression pour réduire les coûts de recrutement de 20% sur l\'année.\n                                    </p>\n</section>\n<section class="mb-8">\n<h4 class="flex items-center gap-2 text-sm font-extrabold text-on-surface uppercase tracking-widest mb-4">\n<span class="w-1.5 h-6 bg-tertiary rounded-full"></span> Steps &amp; Tasks\n                                    </h4>\n<ul class="space-y-4">\n<li class="flex gap-4 group">\n<div class="flex-none w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-bold text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">01</div>\n<div>\n<p class="font-bold text-on-surface">Préparation de l\'argumentaire</p>\n<p class="text-sm text-on-surface-variant">Analyser les besoins de LogiTrans et préparer un SONCAS détaillé.</p>\n</div>\n</li>\n<li class="flex gap-4 group">\n<div class="flex-none w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-bold text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">02</div>\n<div>\n<p class="font-bold text-on-surface">Simulation d\'appel de prospection</p>\n<p class="text-sm text-on-surface-variant">Obtenir un rendez-vous physique malgré l\'objection "Nous avons déjà un cabinet de recrutement".</p>\n</div>\n</li>\n<li class="flex gap-4 group">\n<div class="flex-none w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-xs font-bold text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">03</div>\n<div>\n<p class="font-bold text-on-surface">Configuration démo WordPress</p>\n<p class="text-sm text-on-surface-variant">Intégrer le widget TalentFlow sur le site carrière prototype (WordPress).</p>\n</div>\n</li>\n</ul>\n</section>\n<section>\n<h4 class="flex items-center gap-2 text-sm font-extrabold text-on-surface uppercase tracking-widest mb-4">\n<span class="w-1.5 h-6 bg-secondary rounded-full"></span> Deliverables\n                                    </h4>\n<div class="grid grid-cols-2 gap-4">\n<div class="p-4 bg-surface-container rounded-xl border border-transparent hover:border-primary/10 transition-all">\n<span class="material-symbols-outlined text-primary mb-2">description</span>\n<p class="text-xs font-bold text-on-surface">Fiche de préparation E4</p>\n</div>\n<div class="p-4 bg-surface-container rounded-xl border border-transparent hover:border-primary/10 transition-all">\n<span class="material-symbols-outlined text-primary mb-2">video_call</span>\n<p class="text-xs font-bold text-on-surface">Enregistrement Zoom (Négociation)</p>\n</div>\n</div>\n</section>\n</div>\n</div>\n<!-- Card Footer Actions -->\n<div class="p-6 bg-zinc-50/50 rounded-b-xl flex items-center gap-4">\n<button class="flex-1 py-3.5 rounded-xl bg-primary text-on-primary font-bold shadow-md hover:bg-primary-dim transition-all flex items-center justify-center gap-2" type="button">\n<span class="material-symbols-outlined text-xl">send</span>\n                                Assigner à l\'étudiant\n                            </button>\n<button class="px-6 py-3.5 rounded-xl text-primary font-bold border-2 border-primary/10 hover:bg-primary/5 transition-all flex items-center justify-center gap-2 group" type="button">\n<span class="material-symbols-outlined text-xl transition-transform group-hover:rotate-180">refresh</span>\n                                Régénérer\n                            </button>\n</div>\n</div>\n</section>\n</div>\n</div>\n</main>\n<!-- Overlay Visual Element -->\n<div class="fixed -bottom-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10"></div>\n<div class="fixed top-24 -right-24 w-64 h-64 bg-tertiary/5 rounded-full blur-3xl -z-10"></div>' }} />
-    </>
+    <TeacherLayout>
+      <div className="p-8 max-w-6xl mx-auto space-y-8">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="space-y-2">
+            <Link
+              href="/teacher/missions"
+              className="inline-flex items-center gap-2 text-slate-400 hover:text-purple-600 font-bold text-sm transition-colors"
+            >
+              <ArrowLeft size={16} /> Retour aux épreuves E5B
+            </Link>
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+              Générer une <span className="text-purple-600">Épreuve E5B</span>
+            </h1>
+            <p className="text-slate-500 font-medium">
+              Crée un sujet à partir des compétences sélectionnées, puis enregistre-le dans la bibliothèque des missions.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-100 text-purple-700 rounded-full">
+            <Sparkles size={14} />
+            <span className="text-[10px] font-black uppercase tracking-wider">Génération IA</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+          <section className="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">1. Plateforme</label>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => resetSelectionForPlatform("WORDPRESS")}
+                  className={cn(
+                    "flex-1 py-2.5 text-xs font-bold rounded-lg transition-colors",
+                    selectedPlatform === "WORDPRESS" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
+                  )}
+                >
+                  WordPress
+                </button>
+                <button
+                  onClick={() => resetSelectionForPlatform("PRESTASHOP")}
+                  className={cn(
+                    "flex-1 py-2.5 text-xs font-bold rounded-lg transition-colors",
+                    selectedPlatform === "PRESTASHOP" ? "bg-white text-pink-600 shadow-sm" : "text-slate-500"
+                  )}
+                >
+                  PrestaShop
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">2. Niveau</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 1, label: "Découverte" },
+                  { value: 2, label: "Construction" },
+                  { value: 3, label: "Gestion" },
+                  { value: 4, label: "Expertise" },
+                ].map((level) => (
+                  <button
+                    key={level.value}
+                    onClick={() => setSelectedLevel(level.value as Level)}
+                    className={cn(
+                      "p-3 rounded-xl border text-left transition-all",
+                      selectedLevel === level.value
+                        ? "bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400"
+                        : "bg-white border-slate-200 hover:border-slate-300"
+                    )}
+                  >
+                    <div className="font-bold text-sm text-slate-800">Niveau {level.value}</div>
+                    <div className="text-[10px] uppercase font-bold text-slate-400">{level.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-bold text-slate-700">3. Compétences</label>
+                <span className="text-xs font-bold text-slate-400 p-1 bg-slate-100 rounded-md">
+                  {selectedIds.length} sélectionnées
+                </span>
+              </div>
+              <select
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none text-slate-700 mb-3"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {displayCompetencies.map((competency) => {
+                  const isSelected = selectedIds.includes(competency.id);
+                  return (
+                    <div
+                      key={competency.id}
+                      onClick={() => toggleCompetency(competency.id)}
+                      className={cn(
+                        "p-3 rounded-xl border cursor-pointer transition-all flex gap-3 select-none",
+                        isSelected
+                          ? "bg-indigo-600 border-indigo-600 text-white shadow-md"
+                          : "bg-white border-slate-200 hover:border-indigo-300 text-slate-700"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border",
+                          isSelected ? "bg-white border-white text-indigo-600" : "border-slate-300"
+                        )}
+                      >
+                        {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
+                      </div>
+                      <span className="text-xs font-medium leading-relaxed">{competency.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 space-y-3">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  4. Contexte d&apos;entreprise <span className="text-slate-400 font-normal">(optionnel)</span>
+                </label>
+                <input
+                  type="text"
+                  value={selectedContext}
+                  onChange={(e) => setSelectedContext(e.target.value)}
+                  placeholder="Ex: Boutique de sneakers, Agence web..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 outline-none focus:border-indigo-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  5. Titre de l&apos;épreuve <span className="text-slate-400 font-normal">(optionnel)</span>
+                </label>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder="Ex: E5B WordPress - SEO Local Niveau 3"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 outline-none focus:border-indigo-400"
+                />
+              </div>
+            </div>
+
+            {errorMsg && <p className="text-sm text-red-500 font-bold p-3 bg-red-50 rounded-xl">{errorMsg}</p>}
+
+            <button
+              onClick={handleGenerate}
+              disabled={generating || selectedIds.length === 0}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+            >
+              {generating ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" /> Préparation de la mission...
+                </>
+              ) : (
+                <>
+                  <Target size={18} /> Générer le sujet <Sparkles size={14} />
+                </>
+              )}
+            </button>
+          </section>
+
+          <section className="space-y-4">
+            {!generatedMission && (
+              <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-14 text-center">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                  <BookOpen size={28} />
+                </div>
+                <h3 className="text-lg font-black text-slate-700">Aperçu du sujet E5B</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Sélectionne les compétences, puis clique sur &quot;Générer le sujet&quot;.
+                </p>
+              </div>
+            )}
+
+            {generatedMission && (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} />
+                    <span className="text-xs font-black uppercase tracking-wider">Sujet généré</span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">
+                    {generatedMission.competencyIds.length} compétences
+                  </span>
+                </div>
+
+                <div className="p-6 prose prose-sm max-w-none">
+                  <ReactMarkdown>{generatedMission.text}</ReactMarkdown>
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-2">
+                  <button
+                    onClick={handleSaveMission}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    Enregistrer l&apos;épreuve
+                  </button>
+                  <button
+                    onClick={handleGenerate}
+                    disabled={generating}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} className={generating ? "animate-spin" : ""} />
+                    Régénérer
+                  </button>
+                </div>
+
+                {(justSaved || savedMissionId) && (
+                  <div className="px-6 py-4 border-t border-emerald-100 bg-emerald-50 flex flex-wrap items-center gap-3">
+                    <div className="inline-flex items-center gap-2 text-emerald-700 text-sm font-bold">
+                      <CheckCircle2 size={16} /> Épreuve enregistrée.
+                    </div>
+                    {savedMissionId && (
+                      <Link
+                        href={`/teacher/missions/${savedMissionId}`}
+                        className="inline-flex items-center gap-1 text-sm font-bold text-emerald-800 hover:text-emerald-900"
+                      >
+                        Ouvrir le détail <ChevronRight size={14} />
+                      </Link>
+                    )}
+                    <Link
+                      href="/teacher/missions"
+                      className="inline-flex items-center gap-1 text-sm font-bold text-emerald-800 hover:text-emerald-900"
+                    >
+                      Retour aux épreuves <ChevronRight size={14} />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </TeacherLayout>
   );
 }
