@@ -434,18 +434,23 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                 })}
                               </div>
                             </div>
-                            {/* Commentaire par item */}
-                            <textarea
-                              value={currentComments[`${comp.code}_${idx}`] || ""}
-                              onChange={(e) => handleCommentChange(`${comp.code}_${idx}`, e.target.value)}
-                              disabled={isReadOnly}
-                              placeholder="Commentaire du formateur…"
-                              rows={2}
-                              className={cn(
-                                "w-full text-sm rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-50 resize-none transition-colors",
-                                isReadOnly && "opacity-60 cursor-not-allowed bg-slate-50"
-                              )}
-                            />
+                            {/* Commentaire par critère */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-purple-500 flex items-center gap-1">
+                                💬 Commentaire — {child.description}
+                              </label>
+                              <textarea
+                                value={currentComments[`${comp.code}_${idx}`] || ""}
+                                onChange={(e) => handleCommentChange(`${comp.code}_${idx}`, e.target.value)}
+                                disabled={isReadOnly}
+                                placeholder={`Votre retour sur « ${child.description} » — axes d'amélioration, points forts…`}
+                                rows={2}
+                                className={cn(
+                                  "w-full text-sm rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-50 resize-none transition-colors",
+                                  isReadOnly && "opacity-60 cursor-not-allowed bg-slate-50"
+                                )}
+                              />
+                            </div>
                           </div>
                         </div>
                       );
