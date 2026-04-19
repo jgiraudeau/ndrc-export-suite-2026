@@ -202,6 +202,14 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
             await apiGradeCompetency(studentId, key, grade, currentComments[key] || `Évaluation ${type}`);
           }
         }
+        // Also persist to Evaluation table so the student can see the assessment
+        if (type) {
+          const gradesToPersist: Record<string, number> = {};
+          for (const [key, grade] of Object.entries(currentGrades)) {
+            if (typeof grade === "number" && grade >= 1 && grade <= 4) gradesToPersist[key] = grade;
+          }
+          await apiSaveEvaluationDraft(studentId, type, "FORMATIVE", gradesToPersist, currentComments, globalComment);
+        }
       } else if (type) {
         const gradesToPersist: Record<string, number> = {};
 
@@ -279,7 +287,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">{title}</h2>
             <a
-              href={type === "E4" ? "/docs/referentiel_e4.pdf" : "/docs/referentiel_e6.pdf"}
+              href="/docs/referentiel_e6.pdf"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-[10px] font-black text-indigo-600 uppercase tracking-widest border border-indigo-200 transition-colors"

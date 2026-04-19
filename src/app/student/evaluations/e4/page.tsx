@@ -67,10 +67,11 @@ function parseEvaluationGlobalComment(
     }
 
     try {
-        const parsed = JSON.parse(raw) as { grades?: Record<string, unknown> };
+        const parsed = JSON.parse(raw) as { grades?: Record<string, unknown>; globalComment?: string };
         const rawGrades = parsed?.grades;
+        const teacherComment = typeof parsed?.globalComment === "string" && parsed.globalComment.trim() ? parsed.globalComment.trim() : null;
         if (!rawGrades || typeof rawGrades !== "object" || Array.isArray(rawGrades)) {
-            return { plainComment: raw, gradeDetails: [], averageScore: null };
+            return { plainComment: teacherComment || raw, gradeDetails: [], averageScore: null };
         }
 
         const gradeDetails = Object.entries(rawGrades)
@@ -92,7 +93,7 @@ function parseEvaluationGlobalComment(
                 ? gradeDetails.reduce((sum, item) => sum + item.score, 0) / gradeDetails.length
                 : null;
 
-        return { plainComment: null, gradeDetails, averageScore };
+        return { plainComment: teacherComment, gradeDetails, averageScore };
     } catch {
         return { plainComment: raw, gradeDetails: [], averageScore: null };
     }
