@@ -493,6 +493,7 @@ export async function apiGetEvaluationDraft(
         evaluationKind: EvaluationKind;
         grades: Record<string, number>;
         comments: Record<string, string>;
+        audioComments: Record<string, string>;
         globalComment: string;
         isValidated: boolean;
         validatedAt: string | null;
@@ -506,6 +507,7 @@ export async function apiSaveEvaluationDraft(
     grades: Record<string, number>,
     comments?: Record<string, string>,
     globalComment?: string,
+    audioComments?: Record<string, string>,
 ) {
     return apiFetch<{
         success: boolean;
@@ -515,6 +517,6 @@ export async function apiSaveEvaluationDraft(
         gradesCount: number;
     }>("/api/teacher/evaluations/draft", {
         method: "POST",
-        body: JSON.stringify({ studentId, examType, evaluationKind, grades, comments, globalComment }),
+        body: JSON.stringify({ studentId, examType, evaluationKind, grades, comments, globalComment, audioComments }),
     });
 }

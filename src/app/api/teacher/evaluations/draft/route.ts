@@ -13,6 +13,7 @@ import {
 type StoredGradesPayload = {
   grades?: Record<string, number>;
   comments?: Record<string, string>;
+  audioComments?: Record<string, string>;
   globalComment?: string;
 };
 
@@ -43,17 +44,18 @@ function sanitizeGrades(raw: unknown): Record<string, number> {
   return output;
 }
 
-function parseStoredPayload(raw: string | null): { grades: Record<string, number>; comments: Record<string, string>; globalComment: string } {
-  if (!raw) return { grades: {}, comments: {}, globalComment: "" };
+function parseStoredPayload(raw: string | null): { grades: Record<string, number>; comments: Record<string, string>; audioComments: Record<string, string>; globalComment: string } {
+  if (!raw) return { grades: {}, comments: {}, audioComments: {}, globalComment: "" };
   try {
     const parsed = JSON.parse(raw) as StoredGradesPayload;
     return {
       grades: sanitizeGrades(parsed.grades),
       comments: sanitizeComments(parsed.comments),
+      audioComments: sanitizeComments(parsed.audioComments),
       globalComment: typeof parsed.globalComment === "string" ? parsed.globalComment : "",
     };
   } catch {
-    return { grades: {}, comments: {}, globalComment: "" };
+    return { grades: {}, comments: {}, audioComments: {}, globalComment: "" };
   }
 }
 
@@ -102,6 +104,7 @@ export async function GET(request: NextRequest) {
     evaluationKind,
     grades: stored.grades,
     comments: stored.comments,
+    audioComments: stored.audioComments,
     globalComment: stored.globalComment,
     isValidated: evaluation?.isValidated ?? false,
     validatedAt: evaluation?.validatedAt?.toISOString() ?? null,
@@ -120,6 +123,7 @@ export async function POST(request: NextRequest) {
   );
   const grades = sanitizeGrades(body?.grades);
   const comments = sanitizeComments(body?.comments);
+  const audioComments = sanitizeComments(body?.audioComments);
   const globalComment = typeof body?.globalComment === "string" ? body.globalComment : "";
 
   if (!studentId || !examType) {
@@ -128,7 +132,7 @@ export async function POST(request: NextRequest) {
 
   const searchTypes = buildSearchTypes(examType, evaluationKind);
   const evaluationType = buildEvaluationType(examType, evaluationKind);
-  const encodedGrades = JSON.stringify({ grades, comments, globalComment });
+  const encodedGrades = JSON.stringify({ grades, comments, audioComments, globalComment });
 
   const existing = await prisma.evaluation.findFirst({
     where: {

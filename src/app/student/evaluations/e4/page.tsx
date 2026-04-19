@@ -53,7 +53,7 @@ type EvaluationPhase = "DIAGNOSTIC" | "FORMATIVE" | "PREPARATOIRE";
 type EvaluationDetail = StudentEvaluation & {
     phase: EvaluationPhase;
     plainComment: string | null;
-    gradeDetails: Array<{ criterionId: string; criterionLabel: string; score: number; comment?: string }>;
+    gradeDetails: Array<{ criterionId: string; criterionLabel: string; score: number; comment?: string; audioUrl?: string }>;
     averageScore: number | null;
 };
 
@@ -67,9 +67,10 @@ function parseEvaluationGlobalComment(
     }
 
     try {
-        const parsed = JSON.parse(raw) as { grades?: Record<string, unknown>; comments?: Record<string, string>; globalComment?: string };
+        const parsed = JSON.parse(raw) as { grades?: Record<string, unknown>; comments?: Record<string, string>; audioComments?: Record<string, string>; globalComment?: string };
         const rawGrades = parsed?.grades;
         const rawComments = parsed?.comments ?? {};
+        const rawAudioComments = parsed?.audioComments ?? {};
         const teacherComment = typeof parsed?.globalComment === "string" && parsed.globalComment.trim() ? parsed.globalComment.trim() : null;
         if (!rawGrades || typeof rawGrades !== "object" || Array.isArray(rawGrades)) {
             return { plainComment: teacherComment || raw, gradeDetails: [], averageScore: null };
@@ -81,7 +82,9 @@ function parseEvaluationGlobalComment(
                 if (!Number.isFinite(score)) return [];
                 const comment = typeof rawComments[criterionId] === "string" && rawComments[criterionId].trim()
                     ? rawComments[criterionId].trim() : undefined;
-                return [{ criterionId, criterionLabel: criterionMap[criterionId] || criterionId, score, comment }];
+                const audioUrl = typeof rawAudioComments[criterionId] === "string" && rawAudioComments[criterionId].trim()
+                    ? rawAudioComments[criterionId].trim() : undefined;
+                return [{ criterionId, criterionLabel: criterionMap[criterionId] || criterionId, score, comment, audioUrl }];
             })
             .sort((a, b) => a.criterionLabel.localeCompare(b.criterionLabel, "fr-FR"));
 
@@ -460,6 +463,12 @@ export default function StudentE4Page() {
                                                                             <p className="text-[11px] text-slate-500 italic bg-slate-100 rounded-md px-2 py-1">
                                                                                 💬 {item.comment}
                                                                             </p>
+                                                                        )}
+                                                                        {item.audioUrl && (
+                                                                            <div className="flex flex-col gap-1 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+                                                                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">🎙 Commentaire vocal du formateur</span>
+                                                                                <audio controls src={item.audioUrl} className="w-full h-8" />
+                                                                            </div>
                                                                         )}
                                                                     </div>
                                                                 ))}
