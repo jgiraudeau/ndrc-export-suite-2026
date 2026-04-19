@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
             role: "STUDENT",
             classCode: student.class.code,
             studentId: student.id,
+            wpUrl: student.wpUrl ?? null,
+            prestaUrl: student.prestaUrl ?? null,
         });
 
         response.cookies.set("ndrc_token", token, {

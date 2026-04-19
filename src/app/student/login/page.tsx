@@ -33,6 +33,8 @@ export default function StudentLoginPage() {
             role: "STUDENT",
             classCode: data.classCode,
             studentId: data.studentId,
+            wpUrl: data.wpUrl ?? null,
+            prestaUrl: data.prestaUrl ?? null,
         }));
 
         router.push("/student");
