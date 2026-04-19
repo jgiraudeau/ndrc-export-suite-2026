@@ -1,6 +1,65 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Globe, ShoppingBag, ExternalLink } from "lucide-react";
+
 export default function Page() {
+  const [wpUrl, setWpUrl] = useState<string | null>(null);
+  const [prestaUrl, setPrestaUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("ndrc_user");
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      setWpUrl(user.wpUrl || null);
+      setPrestaUrl(user.prestaUrl || null);
+    }
+  }, []);
+
   return (
     <>
+      {/* Mes Sites — accès rapide */}
+      {(wpUrl || prestaUrl) && (
+        <div className="px-6 pt-6 max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {wpUrl && (
+              <a
+                href={wpUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-4 bg-white border border-sky-100 rounded-2xl px-6 py-4 shadow-sm hover:shadow-md hover:border-sky-300 transition-all group flex-1"
+              >
+                <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                  <Globe size={22} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-0.5">Mon site WordPress</p>
+                  <p className="text-sm font-bold text-sky-600 truncate">{wpUrl}</p>
+                </div>
+                <ExternalLink size={16} className="text-slate-300 group-hover:text-sky-500 transition-colors shrink-0" />
+              </a>
+            )}
+            {prestaUrl && (
+              <a
+                href={prestaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-4 bg-white border border-amber-100 rounded-2xl px-6 py-4 shadow-sm hover:shadow-md hover:border-amber-300 transition-all group flex-1"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <ShoppingBag size={22} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-0.5">Ma boutique PrestaShop</p>
+                  <p className="text-sm font-bold text-amber-600 truncate">{prestaUrl}</p>
+                </div>
+                <ExternalLink size={16} className="text-slate-300 group-hover:text-amber-500 transition-colors shrink-0" />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <style>{`
 .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
