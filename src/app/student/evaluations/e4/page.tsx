@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, GraduationCap, Download, ShieldCheck } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import E4_DATA from "../../../../../prisma/referentiel_e4.json";
 
 type StudentEvaluation = {
+    id: string;
     examType: "E4" | "E6";
     evaluationKind: "FORMATIVE" | "PREPARATOIRE";
     isValidated: boolean;
@@ -15,8 +17,12 @@ type StudentEvaluation = {
     globalComment?: string | null;
 };
 
+type ApiStudentEvaluation = Omit<StudentEvaluation, "evaluationKind"> & {
+    evaluationKind: StudentEvaluation["evaluationKind"] | "CCF";
+};
+
 type EvaluationResponse = {
-    evaluations?: StudentEvaluation[];
+    evaluations?: ApiStudentEvaluation[];
     certifications?: {
         E4?: {
             isValidated: boolean;
@@ -40,6 +46,102 @@ type StudentProfileResponse = {
     student?: StudentProfileData;
 };
 
+type ReferentialChild = { description: string };
+type ReferentialBlock = { code: string; children?: ReferentialChild[] };
+type EvaluationPhase = "DIAGNOSTIC" | "FORMATIVE" | "PREPARATOIRE";
+
+type EvaluationDetail = StudentEvaluation & {
+    phase: EvaluationPhase;
+    plainComment: string | null;
+    gradeDetails: Array<{ criterionId: string; criterionLabel: string; score: number }>;
+    averageScore: number | null;
+};
+
+function parseEvaluationGlobalComment(
+    rawValue: string | null | undefined,
+    criterionMap: Record<string, string>
+): Pick<EvaluationDetail, "plainComment" | "gradeDetails" | "averageScore"> {
+    const raw = (rawValue || "").trim();
+    if (!raw) {
+        return { plainComment: null, gradeDetails: [], averageScore: null };
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as { grades?: Record<string, unknown> };
+        const rawGrades = parsed?.grades;
+        if (!rawGrades || typeof rawGrades !== "object" || Array.isArray(rawGrades)) {
+            return { plainComment: raw, gradeDetails: [], averageScore: null };
+        }
+
+        const gradeDetails = Object.entries(rawGrades)
+            .map(([criterionId, value]) => {
+                const score = Number(value);
+                if (!Number.isFinite(score)) return null;
+
+                return {
+                    criterionId,
+                    criterionLabel: criterionMap[criterionId] || criterionId,
+                    score,
+                };
+            })
+            .filter((item): item is { criterionId: string; criterionLabel: string; score: number } => Boolean(item))
+            .sort((a, b) => b.score - a.score || a.criterionLabel.localeCompare(b.criterionLabel, "fr-FR"));
+
+        const averageScore =
+            gradeDetails.length > 0
+                ? gradeDetails.reduce((sum, item) => sum + item.score, 0) / gradeDetails.length
+                : null;
+
+        return { plainComment: null, gradeDetails, averageScore };
+    } catch {
+        return { plainComment: raw, gradeDetails: [], averageScore: null };
+    }
+}
+
+function normalizeForMatch(value: string): string {
+    return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+}
+
+function getEvaluationPhase(evaluation: StudentEvaluation): EvaluationPhase {
+    if (evaluation.evaluationKind === "PREPARATOIRE") return "PREPARATOIRE";
+    const normalizedSituation = normalizeForMatch(evaluation.situation || "");
+    if (normalizedSituation.includes("diagnostic") || normalizedSituation.includes("positionnement")) {
+        return "DIAGNOSTIC";
+    }
+    return "FORMATIVE";
+}
+
+function getEvaluationKindMeta(phase: EvaluationPhase) {
+    if (phase === "DIAGNOSTIC") {
+        return {
+            label: "Diagnostic",
+            badgeClass: "bg-sky-50 text-sky-700 border border-sky-100",
+        };
+    }
+    if (phase === "FORMATIVE") {
+        return {
+            label: "Formative",
+            badgeClass: "bg-blue-50 text-blue-700 border border-blue-100",
+        };
+    }
+
+    return {
+        label: "Préparatoire",
+        badgeClass: "bg-indigo-50 text-indigo-700 border border-indigo-100",
+    };
+}
+
+function getEvaluationProgressValue(evaluation: EvaluationDetail | null): number {
+    if (!evaluation) return 0;
+    if (evaluation.averageScore !== null) {
+        return Math.max(0, Math.min(100, Math.round((evaluation.averageScore / 4) * 100)));
+    }
+    return 100;
+}
+
 export default function StudentE4Page() {
     const [loading, setLoading] = useState(true);
     const [visibleEvaluations, setVisibleEvaluations] = useState<StudentEvaluation[]>([]);
@@ -48,19 +150,20 @@ export default function StudentE4Page() {
         validatedAt?: string | null;
     } | null>(null);
     const [studentData, setStudentData] = useState<StudentProfileData | null>(null);
+    const [expandedEvaluationId, setExpandedEvaluationId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchGrades = async () => {
-            // Fetch Evaluation Status
             const resEval = await apiFetch<EvaluationResponse>("/api/student/evaluations");
             if (resEval.data) {
                 setVisibleEvaluations(
-                    (resEval.data.evaluations || []).filter((e) => e.examType === "E4")
+                    (resEval.data.evaluations || []).filter(
+                        (e): e is StudentEvaluation => e.examType === "E4" && e.evaluationKind !== "CCF"
+                    )
                 );
                 setCertification(resEval.data.certifications?.E4 || null);
             }
 
-            // Fetch Student Name for PDF
             const resProfile = await apiFetch<StudentProfileResponse>("/api/student/profile");
             if (resProfile.data?.student) setStudentData(resProfile.data.student);
 
@@ -69,13 +172,82 @@ export default function StudentE4Page() {
         fetchGrades();
     }, []);
 
-    const latestFormative = visibleEvaluations
-        .filter((evaluation) => evaluation.evaluationKind === "FORMATIVE")
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] || null;
+    const criterionMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        for (const block of E4_DATA as ReferentialBlock[]) {
+            (block.children || []).forEach((child, idx) => {
+                map[`${block.code}_${idx}`] = child.description;
+            });
+        }
+        return map;
+    }, []);
 
-    const latestPreparatoire = visibleEvaluations
-        .filter((evaluation) => evaluation.evaluationKind === "PREPARATOIRE")
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] || null;
+    const detailedEvaluations = useMemo<EvaluationDetail[]>(
+        () => {
+            const parsed = [...visibleEvaluations]
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .map((evaluation) => ({
+                    ...evaluation,
+                    phase: getEvaluationPhase(evaluation),
+                    ...parseEvaluationGlobalComment(evaluation.globalComment, criterionMap),
+                }));
+
+            const hasDiagnostic = parsed.some((evaluation) => evaluation.phase === "DIAGNOSTIC");
+            if (!hasDiagnostic) {
+                const lastFormativeIndex = [...parsed]
+                    .map((evaluation, idx) => ({ phase: evaluation.phase, idx }))
+                    .filter((item) => item.phase === "FORMATIVE")
+                    .map((item) => item.idx)
+                    .pop();
+
+                if (lastFormativeIndex !== undefined) {
+                    parsed[lastFormativeIndex] = {
+                        ...parsed[lastFormativeIndex],
+                        phase: "DIAGNOSTIC",
+                    };
+                }
+            }
+
+            return parsed;
+        },
+        [visibleEvaluations, criterionMap]
+    );
+
+    const evaluationsByPhase = useMemo<Record<EvaluationPhase, EvaluationDetail[]>>(
+        () => ({
+            DIAGNOSTIC: detailedEvaluations.filter((evaluation) => evaluation.phase === "DIAGNOSTIC"),
+            FORMATIVE: detailedEvaluations.filter((evaluation) => evaluation.phase === "FORMATIVE"),
+            PREPARATOIRE: detailedEvaluations.filter((evaluation) => evaluation.phase === "PREPARATOIRE"),
+        }),
+        [detailedEvaluations]
+    );
+
+    const latestDiagnostic = evaluationsByPhase.DIAGNOSTIC[0] || null;
+    const latestPreparatoire = evaluationsByPhase.PREPARATOIRE[0] || null;
+    const diagnosticProgress = getEvaluationProgressValue(latestDiagnostic);
+    const preparatoireProgress = getEvaluationProgressValue(latestPreparatoire);
+
+    const evaluationRows: Array<{
+        phase: EvaluationPhase;
+        title: string;
+        emptyLabel: string;
+    }> = [
+        {
+            phase: "DIAGNOSTIC",
+            title: "Positionnement Initial",
+            emptyLabel: "Aucune évaluation diagnostique",
+        },
+        {
+            phase: "FORMATIVE",
+            title: "Évaluation Formative",
+            emptyLabel: "Aucune évaluation formative",
+        },
+        {
+            phase: "PREPARATOIRE",
+            title: "Simulation d'Épreuve",
+            emptyLabel: "Aucune évaluation préparatoire",
+        },
+    ];
 
     if (loading) {
         return (
@@ -101,12 +273,11 @@ export default function StudentE4Page() {
                 </div>
             </div>
 
-            {/* Export & Status Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
                 <div className={cn(
                     "p-6 rounded-[24px] border flex items-center justify-between gap-4 transition-all",
-                    certification?.isValidated 
-                        ? "bg-emerald-50 border-emerald-100 text-emerald-900" 
+                    certification?.isValidated
+                        ? "bg-emerald-50 border-emerald-100 text-emerald-900"
                         : "bg-slate-50 border-slate-200 text-slate-500"
                 )}>
                     <div className="flex items-center gap-4">
@@ -126,7 +297,7 @@ export default function StudentE4Page() {
                         </div>
                     </div>
                     {certification?.isValidated && (
-                         <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-lg text-[10px] font-black uppercase tracking-tighter text-emerald-700 border border-emerald-200">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-lg text-[10px] font-black uppercase tracking-tighter text-emerald-700 border border-emerald-200">
                             LE {certification.validatedAt ? new Date(certification.validatedAt).toLocaleDateString() : "N/A"}
                         </div>
                     )}
@@ -137,16 +308,11 @@ export default function StudentE4Page() {
                         <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Suivi Pédagogique</div>
                         <div className="font-bold text-slate-800">Mon Dossier de Progression</div>
                     </div>
-                    <button 
+                    <button
                         onClick={async () => {
                             if (!studentData) return;
-                            // Pour l'étudiant, on génère un passeport de suivi (Passeport Pro)
-                            // au lieu de la grille officielle de CCF.
                             const { DOCXService } = await import("@/lib/docx-service");
-                            DOCXService.generateProPassport(
-                                studentData,
-                                []
-                            );
+                            DOCXService.generateProPassport(studentData, []);
                         }}
                         className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:scale-105 active:scale-95 transition-all"
                     >
@@ -155,7 +321,6 @@ export default function StudentE4Page() {
                 </div>
             </div>
 
-            {/* Section Évaluations Intermédiaires (Visible par l'étudiant) */}
             <div className="space-y-8">
                 <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-black text-slate-800 tracking-tight">Evaluations Intermédiaires</h2>
@@ -165,7 +330,6 @@ export default function StudentE4Page() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Évaluation Diagnostique */}
                     <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center font-black">D</div>
@@ -176,43 +340,146 @@ export default function StudentE4Page() {
                         </div>
                         <div className="space-y-4">
                             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500" style={{ width: latestFormative ? "65%" : "35%" }} />
+                                <div className="h-full bg-blue-500" style={{ width: `${diagnosticProgress}%` }} />
                             </div>
                             <p className="text-xs text-slate-500 italic">
-                                {latestFormative
-                                    ? "Une evaluation formative E4 est disponible dans votre suivi pedagogique."
-                                    : "Aucune evaluation formative E4 enregistree pour le moment."}
+                                {latestDiagnostic
+                                    ? `Dernier diagnostic: ${new Date(latestDiagnostic.date).toLocaleDateString("fr-FR")}`
+                                    : "Aucune évaluation diagnostique E4 enregistrée pour le moment."}
                             </p>
                         </div>
                     </div>
 
-                    {/* Évaluation Préparatoire */}
                     <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all ring-2 ring-indigo-50">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center font-black">P</div>
                             <div>
-                                <h3 className="font-bold text-slate-800 text-lg">Simulation d&apos;Epreuve</h3>
-                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">PREPARATOIRE</p>
+                                <h3 className="font-bold text-slate-800 text-lg">Simulation d&apos;Épreuve</h3>
+                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">PRÉPARATOIRE</p>
                             </div>
                         </div>
                         <div className="space-y-4">
                             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-500" style={{ width: latestPreparatoire ? "70%" : "25%" }} />
+                                <div className="h-full bg-indigo-500" style={{ width: `${preparatoireProgress}%` }} />
                             </div>
                             <p className="text-xs text-slate-500 italic">
                                 {latestPreparatoire
-                                    ? "Une evaluation preparatoire E4 est disponible (entrainement avant CCF)."
-                                    : "Aucune evaluation preparatoire E4 enregistree pour le moment."}
+                                    ? `Dernière préparatoire: ${new Date(latestPreparatoire.date).toLocaleDateString("fr-FR")}`
+                                    : "Aucune évaluation préparatoire E4 enregistrée pour le moment."}
                             </p>
                         </div>
                     </div>
                 </div>
 
-                {/* Information de confidentialité */}
+                <div className="space-y-4">
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight">Liste de mes évaluations E4</h3>
+                    {evaluationRows.map((row) => {
+                        const kindMeta = getEvaluationKindMeta(row.phase);
+                        const phaseEvaluations = evaluationsByPhase[row.phase];
+
+                        return (
+                            <div key={row.phase} className="space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className={cn(
+                                                "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider",
+                                                kindMeta.badgeClass
+                                            )}
+                                        >
+                                            {kindMeta.label}
+                                        </span>
+                                        <span className="text-xs text-slate-500 font-bold">{row.title}</span>
+                                    </div>
+                                    <span className="text-[11px] text-slate-400 font-bold">
+                                        {phaseEvaluations.length} évaluation{phaseEvaluations.length > 1 ? "s" : ""}
+                                    </span>
+                                </div>
+
+                                {phaseEvaluations.length === 0 ? (
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-2 shadow-sm">
+                                        <p className="text-sm font-bold text-slate-800">{row.emptyLabel} pour le moment.</p>
+                                        <p className="text-xs text-slate-500 font-medium">Date: non réalisée</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {phaseEvaluations.map((evaluation) => {
+                                            const isExpanded = expandedEvaluationId === evaluation.id;
+                                            return (
+                                                <div key={evaluation.id} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-slate-500 font-bold">
+                                                                {new Date(evaluation.date).toLocaleDateString("fr-FR")}
+                                                            </span>
+                                                        </div>
+
+                                                        {evaluation.isValidated && (
+                                                            <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                                                Validée
+                                                            </span>
+                                                        )}
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setExpandedEvaluationId((prev) => (prev === evaluation.id ? null : evaluation.id))}
+                                                            className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-colors"
+                                                        >
+                                                            {isExpanded ? "Masquer détails" : "Voir détails"}
+                                                        </button>
+                                                    </div>
+
+                                                    <p className="text-sm font-bold text-slate-800">{evaluation.situation}</p>
+
+                                                    {isExpanded && evaluation.plainComment && (
+                                                        <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-xl p-3">
+                                                            {evaluation.plainComment}
+                                                        </p>
+                                                    )}
+
+                                                    {isExpanded && evaluation.gradeDetails.length > 0 && (
+                                                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3">
+                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                                                                    {evaluation.gradeDetails.length} critères notés
+                                                                </span>
+                                                                {evaluation.averageScore !== null && (
+                                                                    <span className="text-[11px] font-black uppercase tracking-wider text-indigo-600">
+                                                                        Moyenne {evaluation.averageScore.toFixed(2)}/4
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {evaluation.gradeDetails.slice(0, 6).map((item) => (
+                                                                    <div key={item.criterionId} className="flex items-start justify-between gap-3 text-xs">
+                                                                        <span className="text-slate-700">{item.criterionLabel}</span>
+                                                                        <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black">
+                                                                            {item.score}/4
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                                {evaluation.gradeDetails.length > 6 && (
+                                                                    <p className="text-[11px] text-slate-400 font-bold">
+                                                                        +{evaluation.gradeDetails.length - 6} autres critères
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
                 <div className="p-6 bg-slate-900 rounded-[28px] text-white flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-indigo-400">
-                             <ShieldCheck size={20} />
+                            <ShieldCheck size={20} />
                         </div>
                         <p className="text-xs font-medium text-slate-300 max-w-sm">
                             La grille officielle de certification (CCF) est réservée à l&apos;usage des évaluateurs. Seuls vos paliers de progression intermédiaires sont affichés ici.

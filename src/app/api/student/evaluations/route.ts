@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
                         } 
                     } 
                 }
-            }
+            },
+            orderBy: { date: "desc" },
         });
 
         const certifications: Record<ExamType, CertificationSummary> = {
@@ -49,6 +50,25 @@ export async function GET(req: NextRequest) {
         };
 
         const evaluations: StudentVisibleEvaluation[] = [];
+
+        function buildGradesFromScores(
+            scores: Array<{
+                criterionId: string;
+                score: number;
+                criterion: { competency: { code: string } };
+            }>
+        ): string | null {
+            const grades: Record<string, number> = {};
+            for (const score of scores) {
+                const key = score.criterion?.competency?.code || score.criterionId;
+                if (!key) continue;
+                const numeric = Number(score.score);
+                if (!Number.isFinite(numeric)) continue;
+                grades[key] = Math.round(numeric * 100) / 100;
+            }
+            if (Object.keys(grades).length === 0) return null;
+            return JSON.stringify({ grades });
+        }
 
         for (const evaluation of rawEvaluations) {
             const parsed = parseEvaluationType(evaluation.type);
@@ -64,6 +84,7 @@ export async function GET(req: NextRequest) {
                         validatedAt: evaluation.validatedAt?.toISOString() ?? null,
                     };
                 }
+                // Les évaluations certificatives (CCF) sont confidentielles côté élève.
                 continue;
             }
 
@@ -75,7 +96,7 @@ export async function GET(req: NextRequest) {
                 validatedAt: evaluation.validatedAt?.toISOString() ?? null,
                 date: evaluation.date.toISOString(),
                 situation: evaluation.situation,
-                globalComment: evaluation.globalComment,
+                globalComment: evaluation.globalComment ?? buildGradesFromScores(evaluation.scores),
             });
         }
 

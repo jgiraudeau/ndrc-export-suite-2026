@@ -8,8 +8,16 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "NDRC Skills - Compétences Digitales",
-  description: "Suivi des compétences E4/E5 pour le BTS NDRC",
+  title: "FullNDRC - Passeport Pro BTS NDRC",
+  description: "Plateforme de suivi des compétences et évaluations E4, E5B et E6 pour le BTS NDRC.",
+  applicationName: "FullNDRC",
+  icons: {
+    icon: [
+      { url: "/fullndrc-icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: [{ url: "/fullndrc-icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({

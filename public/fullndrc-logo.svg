@@ -1,0 +1,43 @@
+<svg width="420" height="96" viewBox="0 0 420 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fullndrcIconGradient" x1="8" y1="8" x2="88" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38BDF8" />
+      <stop offset="0.55" stop-color="#6366F1" />
+      <stop offset="1" stop-color="#EC4899" />
+    </linearGradient>
+    <linearGradient id="fullndrcTextGradient" x1="110" y1="20" x2="330" y2="74" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E2E8F0" />
+      <stop offset="1" stop-color="#CBD5E1" />
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="80" height="80" rx="24" fill="url(#fullndrcIconGradient)" />
+  <path
+    d="M30 65V30H40L58 53V30H68V65H58L40 42V65H30Z"
+    fill="#FFFFFF"
+  />
+  <circle cx="66" cy="24" r="4" fill="#FFFFFF" fill-opacity="0.9" />
+
+  <text
+    x="110"
+    y="45"
+    fill="url(#fullndrcTextGradient)"
+    font-family="Nunito, system-ui, sans-serif"
+    font-size="34"
+    font-weight="800"
+    letter-spacing="0.5"
+  >
+    FULLNDRC
+  </text>
+  <text
+    x="112"
+    y="70"
+    fill="#94A3B8"
+    font-family="Nunito, system-ui, sans-serif"
+    font-size="14"
+    font-weight="700"
+    letter-spacing="2.2"
+  >
+    COMPETENCES NDRC
+  </text>
+</svg>

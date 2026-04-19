@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
             include: {
                 class: true,
                 progress: true,
+                experiences: {
+                    select: { status: true },
+                },
                 comments: {
                     include: { teacher: true },
                     orderBy: { createdAt: "desc" },
@@ -24,6 +27,9 @@ export async function GET(request: NextRequest) {
 
         const safeStudents = students.map((s) => {
             const acquiredCount = s.progress.filter((p) => p.acquired).length;
+            const totalExperiences = s.experiences.length;
+            const validatedExperiences = s.experiences.filter((e) => e.status === "VALIDATED").length;
+            const submittedExperiences = s.experiences.filter((e) => e.status === "SUBMITTED").length;
 
             let lastActive = null;
             if (s.progress.length > 0) {
@@ -45,6 +51,11 @@ export async function GET(request: NextRequest) {
                 acquiredCount: acquiredCount,
                 progress: 0,
                 lastActive: lastActive,
+                passport: {
+                    totalExperiences,
+                    submittedExperiences,
+                    validatedExperiences,
+                },
                 competencies: s.progress.map((p) => ({
                     competencyId: p.competencyId,
                     acquired: p.acquired,
@@ -84,7 +95,8 @@ function normalizeOptionalImportField(value: unknown): string | null | undefined
     if (value === undefined) return undefined;
     if (typeof value !== "string") return undefined;
     const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
+    // En import, une cellule vide signifie "ne pas modifier la valeur existante".
+    return trimmed.length > 0 ? trimmed : undefined;
 }
 
 async function generateUniqueIdentifier(firstName: string, lastName: string): Promise<string> {

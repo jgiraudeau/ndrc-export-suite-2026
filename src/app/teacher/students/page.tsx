@@ -20,7 +20,7 @@ import {
     FileSpreadsheet
 } from "lucide-react";
 import {
-    apiGetStudents, apiImportStudents, apiAddComment, apiDeleteComment, apiUpdateStudent,
+    apiGetStudents, apiImportStudents, apiAddComment, apiDeleteComment, apiUpdateStudent, apiDeleteStudent,
     type StudentWithProgress
 } from "@/lib/api-client";
 import { ALL_COMPETENCIES, E4_COMPETENCIES, E6_COMPETENCIES, WORDPRESS_COMPETENCIES, PRESTASHOP_COMPETENCIES } from "@/data/competencies";
@@ -42,10 +42,15 @@ type ImportStudentRow = {
 type ImportField = keyof ImportStudentRow;
 type StudentCompetency = StudentWithProgress["competencies"][number];
 type StudentWithComputedProgress = StudentWithProgress & {
+    validatedCount: number;
     progress: number;
     e4Progress: number;
     e6Progress: number;
     digitalProgress: number;
+    passportProgress: number;
+    e4Acquired: number;
+    e6Acquired: number;
+    digitalAcquired: number;
 };
 
 const IMPORT_HEADER_ALIASES: Record<ImportField, string[]> = {
@@ -194,6 +199,7 @@ export default function TeacherDashboard() {
     const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
     const [wpInputs, setWpInputs] = useState<Record<string, string>>({});
     const [prestaInputs, setPrestaInputs] = useState<Record<string, string>>({});
+    const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
 
     const router = useRouter();
 
@@ -208,6 +214,29 @@ export default function TeacherDashboard() {
         } else {
             alert(error);
         }
+    };
+
+    const handleDeleteStudent = async (studentId: string) => {
+        const student = students.find((s) => s.id === studentId);
+        if (!student) return;
+
+        const confirmed = confirm(
+            `Supprimer définitivement ${student.firstName} ${student.lastName} ?\n\nCette action est irréversible.`
+        );
+        if (!confirmed) return;
+
+        setDeletingStudentId(studentId);
+        const { data, error } = await apiDeleteStudent(studentId);
+        setDeletingStudentId(null);
+
+        if (error || !data?.deleted) {
+            setImportStatus({ type: "error", message: error || "Impossible de supprimer cet étudiant." });
+            return;
+        }
+
+        setStudents((prev) => prev.filter((s) => s.id !== studentId));
+        setExpandedStudentId((prev) => (prev === studentId ? null : prev));
+        setImportStatus({ type: "success", message: data.message || "Étudiant supprimé." });
     };
 
     const fetchStudents = useCallback(async () => {
@@ -337,16 +366,28 @@ export default function TeacherDashboard() {
             s.lastName.toLowerCase().includes(searchTerm.toLowerCase())
         )
         .map(s => {
-            const e4Acquired = s.competencies.filter((c: StudentCompetency) => E4_COMPETENCIES.some(e => e.id === c.competencyId) && c.acquired).length;
-            const e6Acquired = s.competencies.filter((c: StudentCompetency) => E6_COMPETENCIES.some(e => e.id === c.competencyId) && c.acquired).length;
-            const digitalAcquired = s.competencies.filter((c: StudentCompetency) => (WORDPRESS_COMPETENCIES.some(w => w.id === c.competencyId) || PRESTASHOP_COMPETENCIES.some(p => p.id === c.competencyId)) && c.acquired).length;
+            const isValidated = (c: StudentCompetency) => c.acquired || (c.teacherStatus ?? -1) >= 3;
+            const acquiredOrValidatedCount = s.competencies.filter(isValidated).length;
+            const e4Acquired = s.competencies.filter((c: StudentCompetency) => c.competencyId.startsWith("E4.") && isValidated(c)).length;
+            const e6Acquired = s.competencies.filter((c: StudentCompetency) => c.competencyId.startsWith("E6.") && isValidated(c)).length;
+            const digitalAcquired = s.competencies.filter((c: StudentCompetency) => {
+                const normalized = c.competencyId.toLowerCase();
+                return (normalized.startsWith("wp-") || normalized.startsWith("ps-")) && isValidated(c);
+            }).length;
+            const passportTotal = s.passport?.totalExperiences ?? 0;
+            const passportValidated = s.passport?.validatedExperiences ?? 0;
 
             return {
                 ...s,
-                progress: TOTAL_COMPETENCIES > 0 ? Math.round((s.acquiredCount / TOTAL_COMPETENCIES) * 100) : 0,
+                validatedCount: acquiredOrValidatedCount,
+                progress: TOTAL_COMPETENCIES > 0 ? Math.round((acquiredOrValidatedCount / TOTAL_COMPETENCIES) * 100) : 0,
                 e4Progress: TOTAL_E4 > 0 ? Math.round((e4Acquired / TOTAL_E4) * 100) : 0,
                 e6Progress: TOTAL_E6 > 0 ? Math.round((e6Acquired / TOTAL_E6) * 100) : 0,
                 digitalProgress: TOTAL_DIGITAL > 0 ? Math.round((digitalAcquired / TOTAL_DIGITAL) * 100) : 0,
+                passportProgress: passportTotal > 0 ? Math.round((passportValidated / passportTotal) * 100) : 0,
+                e4Acquired,
+                e6Acquired,
+                digitalAcquired,
             };
         });
 
@@ -357,7 +398,10 @@ export default function TeacherDashboard() {
                 <div className="flex flex-col md:flex-row justify-between items-end gap-4">
                     <div>
                         <h1 className="text-2xl font-black text-slate-800">Mes Étudiants</h1>
-                        <p className="text-slate-500 text-sm">Gérez vos classes et suivez les compétences digitales.</p>
+                        <p className="text-slate-500 text-sm">Gérez vos classes et suivez E4, E5B, E6 et le Passeport Pro.</p>
+                        <p className="text-red-500 text-xs font-bold mt-1">
+                            Suppression rapide: utilisez l&apos;icône poubelle rouge sur chaque ligne étudiant.
+                        </p>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={fetchStudents} className="p-2.5 text-slate-400 hover:text-purple-600 transition-colors bg-white border border-slate-200 rounded-xl" title="Actualiser">
@@ -405,6 +449,9 @@ export default function TeacherDashboard() {
                                 Dupont;Pierre;NDRC1;monmdp1;https://wp.ex.fr;https://ps.ex.fr/admin<br />
                                 Martin;Alice;NDRC2;monmdp2;https://wp2.ex.fr;https://ps2.ex.fr/admin
                             </div>
+                            <p className="mt-3 text-[11px] text-slate-500 font-medium">
+                                Astuce: si une case URL est vide dans le fichier, l&apos;URL actuelle de l&apos;étudiant est conservée.
+                            </p>
                         </div>
                         <button onClick={downloadCsvTemplate} className="mt-4 w-full bg-purple-600 text-white px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors">
                             <Download size={16} /> Télécharger le modèle CSV
@@ -449,12 +496,30 @@ export default function TeacherDashboard() {
                                                 {student.firstName} <span className="uppercase">{student.lastName}</span>
                                                 <span className="ml-2 inline-block px-2 py-0.5 bg-slate-100 text-slate-500 text-xs font-bold rounded-md">{student.classCode}</span>
                                             </div>
+                                            <div className="mt-1 flex flex-wrap gap-1.5">
+                                                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-wider">E4 {student.e4Progress}%</span>
+                                                <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[10px] font-black uppercase tracking-wider">E5B {student.digitalProgress}%</span>
+                                                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider">E6 {student.e6Progress}%</span>
+                                                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider">Passeport {student.passportProgress}%</span>
+                                            </div>
                                             <div className="mt-1.5"><ProgressBar value={student.progress} color={pColor} /></div>
                                         </div>
                                         <div className="flex-shrink-0 text-right hidden sm:block">
-                                            <a href={`/teacher/student/${student.id}`} className="text-xs text-purple-600 hover:text-purple-800 font-bold hover:underline">{student.acquiredCount}/{TOTAL_COMPETENCIES} compétences</a>
+                                            <a href={`/teacher/student/${student.id}`} className="text-xs text-purple-600 hover:text-purple-800 font-bold hover:underline">{student.validatedCount}/{TOTAL_COMPETENCIES} compétences</a>
                                             {student.comments.length > 0 && <div className="text-xs text-purple-500 font-bold mt-0.5">💬 {student.comments.length}</div>}
                                         </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                void handleDeleteStudent(student.id);
+                                            }}
+                                            disabled={deletingStudentId === student.id}
+                                            title="Supprimer cet étudiant"
+                                            aria-label={`Supprimer ${student.firstName} ${student.lastName}`}
+                                            className="flex-shrink-0 p-2 rounded-xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors disabled:opacity-50"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                         <div className="text-slate-400 flex-shrink-0 cursor-pointer" onClick={() => setExpandedStudentId(isExpanded ? null : student.id)}>{isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</div>
                                     </div>
 
@@ -492,18 +557,44 @@ export default function TeacherDashboard() {
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="mt-3 flex justify-end">
+                                                    <button
+                                                        onClick={() => handleDeleteStudent(student.id)}
+                                                        disabled={deletingStudentId === student.id}
+                                                        className="bg-red-50 text-red-700 border border-red-100 px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                        {deletingStudentId === student.id ? "Suppression..." : "Supprimer l'étudiant"}
+                                                    </button>
+                                                </div>
+                                                <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
                                                     <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
                                                         <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Bloc E4 (Vente)</p>
                                                         <ProgressBar value={student.e4Progress} color="bg-blue-500" />
-                                                    </div>
-                                                    <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Bloc E6 (Réseaux)</p>
-                                                        <ProgressBar value={student.e6Progress} color="bg-indigo-500" />
+                                                        <p className="mt-1 text-[10px] text-slate-400 font-bold uppercase">
+                                                            {student.e4Acquired}/{TOTAL_E4} validées
+                                                        </p>
                                                     </div>
                                                     <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
                                                         <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Bloc E5B (Digital)</p>
                                                         <ProgressBar value={student.digitalProgress} color="bg-sky-500" />
+                                                        <p className="mt-1 text-[10px] text-slate-400 font-bold uppercase">
+                                                            {student.digitalAcquired}/{TOTAL_DIGITAL} validées
+                                                        </p>
+                                                    </div>
+                                                    <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Bloc E6 (Réseaux)</p>
+                                                        <ProgressBar value={student.e6Progress} color="bg-indigo-500" />
+                                                        <p className="mt-1 text-[10px] text-slate-400 font-bold uppercase">
+                                                            {student.e6Acquired}/{TOTAL_E6} validées
+                                                        </p>
+                                                    </div>
+                                                    <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Passeport Pro</p>
+                                                        <ProgressBar value={student.passportProgress} color="bg-emerald-500" />
+                                                        <p className="mt-1 text-[10px] text-slate-400 font-bold uppercase">
+                                                            {student.passport?.validatedExperiences ?? 0}/{student.passport?.totalExperiences ?? 0} validées
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>

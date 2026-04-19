@@ -1,11 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 import { ALL_COMPETENCIES } from "@/data/competencies";
-import type { Part } from "@google/genai";
 import { genAI } from "@/lib/ai/gemini";
-import { ensureGlobalFileSearchStore } from "@/lib/ai/file-search";
-import fs from "fs";
-import path from "path";
 
 export async function POST(request: NextRequest) {
     try {
@@ -72,83 +68,8 @@ L'e-mail doit globalement :
 Génère uniquement le contenu de cet email.
 `;
 
-        // 1. Chercher les PDFs pertinents dans knowledge/
-        // Structure : knowledge/wordpress/, knowledge/prestashop/, knowledge/seo/, knowledge/sujets/
-        const knowledgeDir = path.join(process.cwd(), "knowledge");
-        const coursePdfs: { filePath: string; filename: string }[] = [];
-        const sujetsPdfs: { filePath: string; filename: string }[] = [];
-
-        if (fs.existsSync(knowledgeDir)) {
-            // Dossiers de cours liés à la plateforme sélectionnée
-            const platformFolders: Record<string, string[]> = {
-                WORDPRESS: ["wordpress", "seo"],    // YoastSEO = plugin WordPress
-                PRESTASHOP: ["prestashop"],
-            };
-            const folders = platformFolders[platform] || [];
-
-            for (const folder of folders) {
-                const folderPath = path.join(knowledgeDir, folder);
-                if (fs.existsSync(folderPath)) {
-                    for (const file of fs.readdirSync(folderPath)) {
-                        if (file.endsWith(".pdf")) {
-                            coursePdfs.push({ filePath: path.join(folderPath, file), filename: file });
-                        }
-                    }
-                }
-            }
-
-            // Dossier sujets d'examen : d'abord le sous-dossier de la plateforme, puis la racine
-            // Structure : knowledge/sujets/wordpress/, knowledge/sujets/prestashop/
-            const sujetsBase = path.join(knowledgeDir, "sujets");
-            if (fs.existsSync(sujetsBase)) {
-                // Sujets spécifiques à la plateforme
-                const sujetsPlatform = path.join(sujetsBase, platform.toLowerCase());
-                if (fs.existsSync(sujetsPlatform)) {
-                    for (const file of fs.readdirSync(sujetsPlatform)) {
-                        if (file.endsWith(".pdf")) {
-                            sujetsPdfs.push({ filePath: path.join(sujetsPlatform, file), filename: file });
-                        }
-                    }
-                }
-                // Sujets généraux (à la racine de sujets/)
-                for (const file of fs.readdirSync(sujetsBase)) {
-                    const fullPath = path.join(sujetsBase, file);
-                    if (file.endsWith(".pdf") && !fs.statSync(fullPath).isDirectory()) {
-                        sujetsPdfs.push({ filePath: fullPath, filename: file });
-                    }
-                }
-            }
-        }
-
-        // 2. Préparer les parties (parts) du message pour l'API Gemini
-        const parts: Part[] = [];
-
-        if (coursePdfs.length > 0) {
-            parts.push({ text: "Voici les fiches de cours officielles (Knowledge Base) : " });
-            coursePdfs.forEach(doc => {
-                const base64 = fs.readFileSync(doc.filePath).toString("base64");
-                parts.push({ inlineData: { data: base64, mimeType: "application/pdf" } });
-            });
-            parts.push({ text: "\nTu dois IMPÉRATIVEMENT t'assurer que les tâches demandées dans la mission sont faisables et correspondent à ce qui est enseigné dans ces fiches de cours. Inspire-toi du vocabulaire utilisé.\n" });
-        }
-
-        if (sujetsPdfs.length > 0) {
-            parts.push({ text: "\nVoici des exemples de sujets d'examen BTS NDRC (épreuves E5/E6). Inspire-toi de leur style, de leur niveau d'exigence et de leurs mises en situation pour rendre ta mission plus réaliste et conforme aux attentes de l'examen :\n" });
-            sujetsPdfs.forEach(doc => {
-                const base64 = fs.readFileSync(doc.filePath).toString("base64");
-                parts.push({ inlineData: { data: base64, mimeType: "application/pdf" } });
-            });
-        }
-
-        parts.push({ text: prompt });
-
-        // 3. Préparer le RAG global (piloté par l'admin)
-        let ragStoreName: string | null = null;
-        try {
-            ragStoreName = await ensureGlobalFileSearchStore();
-        } catch (err) {
-            console.error("[missions/generate][file-search] Unable to resolve global RAG store:", err);
-        }
+        // Le store RAG global est piloté par l'admin (pas d'embarquement local des PDFs).
+        const ragStoreName = process.env.RAG_GLOBAL_STORE_NAME?.trim() || null;
 
         const config: {
             temperature: number;
@@ -169,7 +90,7 @@ Génère uniquement le contenu de cet email.
 
         const response = await genAI.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: parts,
+            contents: prompt,
             config,
         });
 

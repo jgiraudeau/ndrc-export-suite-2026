@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
     ArrowRight, LayoutDashboard,
     Globe, ShoppingBag, BarChart3, Mail, MonitorSmartphone, Share2, ShieldCheck, PenTool
@@ -18,9 +19,14 @@ export default function LandingPage() {
 
             {/* Navbar */}
             <nav className="relative z-10 max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center font-black text-white shadow-xl shadow-indigo-500/20 text-lg">N</div>
-                    <span className="font-extrabold text-2xl tracking-tight text-white">NDRC Skills</span>
+                <div className="flex items-center">
+                    <Image
+                        src="/fullndrc-logo.svg"
+                        alt="Logo FullNDRC"
+                        width={210}
+                        height={48}
+                        priority
+                    />
                 </div>
                 <div className="flex items-center gap-6">
                     <Link href="/teacher/login" className="hidden md:block text-sm font-medium text-slate-300 hover:text-white transition-colors">
@@ -44,15 +50,15 @@ export default function LandingPage() {
                 </div>
 
                 <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-8 leading-tight">
-                    Votre passeport pour <br />
+                    Votre passeport pro pour <br />
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                        l&apos;épreuve E5 Digitale
+                        le BTS NDRC
                     </span>
                 </h1>
 
                 <p className="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
                     Ne laissez plus le hasard décider de votre note. <br className="hidden md:block" />
-                    Maîtrisez <span className="text-white">WordPress</span>, <span className="text-white">PrestaShop</span> et les stratégies digitales grâce à un suivi précis de vos compétences.
+                    Maîtrisez <span className="text-white">WordPress</span>, <span className="text-white">PrestaShop</span> et réussissez E4 et E6 grâce à un suivi précis de vos compétences.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto mb-16">
@@ -104,9 +110,13 @@ export default function LandingPage() {
 
             {/* Footer */}
             <footer className="border-t border-white/5 py-8 bg-[#020617] text-center relative z-10 text-slate-600 text-sm">
-                <div className="flex items-center justify-center gap-2 mb-4">
-                    <div className="w-6 h-6 bg-slate-800 rounded-lg flex items-center justify-center font-bold text-white text-xs">N</div>
-                    <span className="font-bold text-slate-400">NDRC Skills</span>
+                <div className="flex items-center justify-center mb-4">
+                    <Image
+                        src="/fullndrc-logo.svg"
+                        alt="Logo FullNDRC"
+                        width={170}
+                        height={40}
+                    />
                 </div>
                 <p>© {new Date().getFullYear()} - La plateforme de réussite pour le BTS Négociation et Digitalisation de la Relation Client.</p>
             </footer>

@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { LayoutDashboard, Target, Globe, ShoppingBag, LogOut, Briefcase, BookOpen, GraduationCap, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FloatingTuteur } from "@/components/student/FloatingTuteur";
 
 const NAV_ITEMS = [
     { href: "/student", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
@@ -39,7 +40,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 p-6 fixed h-full z-30">
                 <div className="flex items-center gap-3 mb-10 px-2">
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">N</div>
-                    <span className="font-extrabold text-xl tracking-tight text-indigo-900">NDRC Skills</span>
+                    <span className="font-extrabold text-xl tracking-tight text-indigo-900">Compétences NDRC</span>
                 </div>
 
                 <nav className="flex-1 space-y-1">
@@ -75,6 +76,9 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             <div className="flex-1 md:ml-64 min-h-screen pb-16 md:pb-0">
                 {children}
             </div>
+
+            {/* ── Floating Tuteur IA ───────────────────────────── */}
+            <FloatingTuteur />
 
             {/* ── Mobile Bottom Nav ────────────────────────────── */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center z-30 h-16">

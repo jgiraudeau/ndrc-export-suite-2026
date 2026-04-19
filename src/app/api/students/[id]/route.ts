@@ -16,6 +16,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             include: {
                 class: true,
                 progress: true,
+                experiences: {
+                    select: { status: true },
+                },
                 comments: {
                     include: { teacher: true },
                     orderBy: { createdAt: "desc" },
@@ -28,6 +31,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         }
 
         const acquiredCount = student.progress.filter((p) => p.acquired).length;
+        const totalExperiences = student.experiences.length;
+        const validatedExperiences = student.experiences.filter((e) => e.status === "VALIDATED").length;
+        const submittedExperiences = student.experiences.filter((e) => e.status === "SUBMITTED").length;
 
         let lastActive = null;
         if (student.progress.length > 0) {
@@ -48,6 +54,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             prestaUrl: student.prestaUrl,
             acquiredCount,
             lastActive,
+            passport: {
+                totalExperiences,
+                submittedExperiences,
+                validatedExperiences,
+            },
             competencies: student.progress.map((p) => ({
                 competencyId: p.competencyId,
                 acquired: p.acquired,
@@ -119,5 +130,47 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     } catch (error) {
         console.error("[PATCH /api/students/[id]] Error:", error);
         return apiError("Erreur serveur lors de la mise à jour de l'étudiant", 500);
+    }
+}
+
+// DELETE /api/students/[id]
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+    const auth = await requireAuth(request, ["TEACHER"]);
+    if ("status" in auth) return auth;
+
+    try {
+        const params = await context.params;
+        const studentId = params.id;
+
+        const existingStudent = await prisma.student.findUnique({
+            where: { id: studentId },
+            select: {
+                id: true,
+                teacherId: true,
+                firstName: true,
+                lastName: true,
+            },
+        });
+
+        if (!existingStudent) {
+            return apiError("Étudiant introuvable", 404);
+        }
+
+        if (existingStudent.teacherId !== auth.payload.sub) {
+            return apiError("Non autorisé à supprimer cet étudiant", 403);
+        }
+
+        await prisma.student.delete({
+            where: { id: studentId },
+        });
+
+        return apiSuccess({
+            deleted: true,
+            studentId,
+            message: `Étudiant ${existingStudent.firstName} ${existingStudent.lastName} supprimé`,
+        });
+    } catch (error) {
+        console.error("[DELETE /api/students/[id]] Error:", error);
+        return apiError("Erreur serveur lors de la suppression de l'étudiant", 500);
     }
 }

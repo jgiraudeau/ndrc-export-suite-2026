@@ -254,6 +254,9 @@ export function EvaluationTable({ students, type }: EvaluationTableProps) {
                         />
                       </div>
                       <span className="text-xs font-black text-slate-700 w-8">{student.progress}%</span>
+                      <span className="text-[10px] font-black text-slate-400 w-16 text-right">
+                        {student.evaluatedCount}/{student.totalCount}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">

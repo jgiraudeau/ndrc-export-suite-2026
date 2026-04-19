@@ -88,6 +88,11 @@ export interface StudentWithProgress {
     prestaUrl?: string | null;
     acquiredCount: number;
     lastActive: string | null;
+    passport?: {
+        totalExperiences: number;
+        submittedExperiences: number;
+        validatedExperiences: number;
+    };
     competencies: Array<{
         competencyId: string;
         acquired: boolean;
@@ -114,6 +119,13 @@ export async function apiUpdateStudent(id: string, data: { wpUrl?: string; prest
     return apiFetch<{ message: string; student: StudentWithProgress }>(
         `/api/students/${id}`,
         { method: "PATCH", body: JSON.stringify(data) }
+    );
+}
+
+export async function apiDeleteStudent(id: string) {
+    return apiFetch<{ deleted: boolean; studentId: string; message: string }>(
+        `/api/students/${id}`,
+        { method: "DELETE" }
     );
 }
 

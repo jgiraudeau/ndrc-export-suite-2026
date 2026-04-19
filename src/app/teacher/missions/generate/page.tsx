@@ -13,6 +13,7 @@ import {
   BookOpen,
   RefreshCw,
   ChevronRight,
+  Search,
 } from "lucide-react";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
 import { ALL_COMPETENCIES } from "@/data/competencies";
@@ -26,10 +27,46 @@ interface GeneratedMission {
   competencyIds: string[];
 }
 
+const normalizeForMatch = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const getCompetencyFamily = (label: string, category?: string) => {
+  const source = normalizeForMatch(`${category ?? ""} ${label}`);
+
+  if (source.match(/seo|referencement|mot cle|meta|balise|yoast|etiquette/)) {
+    return "Référencement SEO";
+  }
+  if (source.match(/image|media|galerie|legende|alt|couverture|video/)) {
+    return "Images et médias";
+  }
+  if (source.match(/menu|navigation|fil d ariane|backoffice|frontoffice|lien/)) {
+    return "Navigation et menus";
+  }
+  if (source.match(/produit|categorie|declinaison|pack|stock|attribut|caracteristique|marque/)) {
+    return "Catalogue produits";
+  }
+  if (source.match(/commande|avoir|retour|promotion|panier|sav|reclamation|transporteur/)) {
+    return "Commandes et service client";
+  }
+  if (source.match(/module|bloc|widget|carrousel|spectra|popup|countdown|reassurance/)) {
+    return "Modules et blocs";
+  }
+  if (source.match(/utilisateur|role|collaborateur|profil|permission|auteur/)) {
+    return "Utilisateurs et droits";
+  }
+
+  return category || "Autres";
+};
+
 export default function TeacherMissionGeneratePage() {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>("WORDPRESS");
   const [selectedLevel, setSelectedLevel] = useState<Level>(2);
   const [selectedCategory, setSelectedCategory] = useState<string>("Toutes");
+  const [selectedFamily, setSelectedFamily] = useState<string>("Toutes");
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedContext, setSelectedContext] = useState("");
   const [customTitle, setCustomTitle] = useState("");
@@ -46,22 +83,74 @@ export default function TeacherMissionGeneratePage() {
     [selectedPlatform]
   );
   const categories = useMemo(
-    () => ["Toutes", ...Array.from(new Set(platformCompetencies.map((c) => c.category)))],
+    () => ["Toutes", ...Array.from(new Set(platformCompetencies.map((c) => c.category || "Autres")))],
     [platformCompetencies]
   );
+  const families = useMemo(
+    () =>
+      [
+        "Toutes",
+        ...Array.from(
+          new Set(platformCompetencies.map((c) => getCompetencyFamily(c.label, c.category)))
+        ),
+      ],
+    [platformCompetencies]
+  );
+
+  const normalizedSearch = useMemo(() => normalizeForMatch(searchTerm.trim()), [searchTerm]);
 
   const displayCompetencies = useMemo(
     () =>
       platformCompetencies.filter(
-        (c) => selectedCategory === "Toutes" || c.category === selectedCategory
+        (c) =>
+          (selectedCategory === "Toutes" || (c.category || "Autres") === selectedCategory) &&
+          (selectedFamily === "Toutes" ||
+            getCompetencyFamily(c.label, c.category) === selectedFamily) &&
+          (normalizedSearch === "" ||
+            normalizeForMatch(`${c.label} ${c.category ?? ""}`).includes(normalizedSearch))
       ),
-    [platformCompetencies, selectedCategory]
+    [platformCompetencies, selectedCategory, selectedFamily, normalizedSearch]
   );
+
+  const groupedCompetencies = useMemo(() => {
+    const groups = new Map<string, typeof displayCompetencies>();
+
+    for (const competency of displayCompetencies) {
+      const family = getCompetencyFamily(competency.label, competency.category);
+      const existing = groups.get(family) || [];
+      existing.push(competency);
+      groups.set(family, existing);
+    }
+
+    return Array.from(groups.entries())
+      .map(([family, items]) => ({
+        family,
+        items: [...items].sort(
+          (a, b) => (a.level ?? 99) - (b.level ?? 99) || a.label.localeCompare(b.label, "fr-FR")
+        ),
+      }))
+      .sort((a, b) => a.family.localeCompare(b.family, "fr-FR"));
+  }, [displayCompetencies]);
+
+  const toggleFamilySelection = (competencyIds: string[]) => {
+    setSelectedIds((prev) => {
+      const allSelected = competencyIds.every((id) => prev.includes(id));
+      if (allSelected) {
+        return prev.filter((id) => !competencyIds.includes(id));
+      }
+
+      const next = new Set(prev);
+      competencyIds.forEach((id) => next.add(id));
+      return Array.from(next);
+    });
+  };
 
   const resetSelectionForPlatform = (nextPlatform: Platform) => {
     setSelectedPlatform(nextPlatform);
     setSelectedIds([]);
     setSelectedCategory("Toutes");
+    setSelectedFamily("Toutes");
+    setSearchTerm("");
     setGeneratedMission(null);
     setSavedMissionId(null);
     setJustSaved(false);
@@ -245,41 +334,124 @@ export default function TeacherMissionGeneratePage() {
                   {selectedIds.length} sélectionnées
                 </span>
               </div>
-              <select
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none text-slate-700 mb-3"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                <select
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none text-slate-700"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                >
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      Catégorie: {category}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none text-slate-700"
+                  value={selectedFamily}
+                  onChange={(e) => setSelectedFamily(e.target.value)}
+                >
+                  {families.map((family) => (
+                    <option key={family} value={family}>
+                      Famille: {family}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                {displayCompetencies.map((competency) => {
-                  const isSelected = selectedIds.includes(competency.id);
+              <div className="relative mb-3">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Rechercher une compétence..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400"
+                />
+              </div>
+
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                {groupedCompetencies.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    Aucune compétence ne correspond aux filtres.
+                  </div>
+                )}
+
+                {groupedCompetencies.map(({ family, items }) => {
+                  const selectedInFamily = items.filter((c) => selectedIds.includes(c.id)).length;
+                  const familyIds = items.map((c) => c.id);
+                  const allFamilySelected = items.length > 0 && selectedInFamily === items.length;
+
                   return (
-                    <div
-                      key={competency.id}
-                      onClick={() => toggleCompetency(competency.id)}
-                      className={cn(
-                        "p-3 rounded-xl border cursor-pointer transition-all flex gap-3 select-none",
-                        isSelected
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-md"
-                          : "bg-white border-slate-200 hover:border-indigo-300 text-slate-700"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border",
-                          isSelected ? "bg-white border-white text-indigo-600" : "border-slate-300"
-                        )}
-                      >
-                        {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
+                    <div key={family} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                      <div className="px-3 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-black text-slate-700">{family}</p>
+                          <p className="text-[11px] text-slate-500 font-semibold">
+                            {selectedInFamily}/{items.length} sélectionnées
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleFamilySelection(familyIds)}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                        >
+                          {allFamilySelected ? "Tout retirer" : "Tout sélectionner"}
+                        </button>
                       </div>
-                      <span className="text-xs font-medium leading-relaxed">{competency.label}</span>
+
+                      <div className="p-2 space-y-2">
+                        {items.map((competency) => {
+                          const isSelected = selectedIds.includes(competency.id);
+                          return (
+                            <div
+                              key={competency.id}
+                              onClick={() => toggleCompetency(competency.id)}
+                              className={cn(
+                                "p-3 rounded-xl border cursor-pointer transition-all flex gap-3 select-none",
+                                isSelected
+                                  ? "bg-indigo-600 border-indigo-600 text-white shadow-md"
+                                  : "bg-white border-slate-200 hover:border-indigo-300 text-slate-700"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border",
+                                  isSelected ? "bg-white border-white text-indigo-600" : "border-slate-300"
+                                )}
+                              >
+                                {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
+                              </div>
+
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  {competency.level && (
+                                    <span
+                                      className={cn(
+                                        "text-[10px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-wide",
+                                        isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                                      )}
+                                    >
+                                      Niv.{competency.level}
+                                    </span>
+                                  )}
+                                  {competency.category && (
+                                    <span
+                                      className={cn(
+                                        "text-[10px] px-1.5 py-0.5 rounded-md font-bold",
+                                        isSelected ? "bg-white/15 text-white/90" : "bg-slate-100 text-slate-500"
+                                      )}
+                                    >
+                                      {competency.category}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs font-medium leading-relaxed">{competency.label}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
