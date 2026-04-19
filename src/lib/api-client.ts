@@ -54,7 +54,7 @@ export async function apiTeacherRegister(name: string, email: string, password: 
 }
 
 export async function apiStudentLogin(identifier: string, password: string) {
-    return apiFetch<{ token: string; name: string; role: string; classCode: string; studentId: string }>(
+    return apiFetch<{ token: string; name: string; role: string; classCode: string; studentId: string; wpUrl: string | null; prestaUrl: string | null }>(
         "/api/auth/student/login",
         { method: "POST", body: JSON.stringify({ identifier, password }) }
     );
