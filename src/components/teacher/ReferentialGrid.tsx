@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { 
-  ChevronDown, 
-  ChevronUp, 
-  Save, 
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Save,
   Loader2,
   AlertCircle,
   Sparkles,
   ShieldCheck,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -76,6 +78,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   });
   const [loadingKindData, setLoadingKindData] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [listeningKey, setListeningKey] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   const isValidated = validationByKind[evaluationKind].isValidated;
   const validatedAt = validationByKind[evaluationKind].validatedAt;
@@ -165,6 +170,33 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     const competencyCode = key.replace(/_\d+$/, "");
     setDirtyCodes(prev => new Set(prev).add(competencyCode));
   };
+
+  const startVoice = useCallback((key: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    if (!SR) { alert("Reconnaissance vocale non supportée sur ce navigateur (utilisez Chrome ou Safari)."); return; }
+    if (listeningKey === key) {
+      recognitionRef.current?.stop();
+      setListeningKey(null);
+      return;
+    }
+    recognitionRef.current?.stop();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = new SR() as any;
+    r.lang = "fr-FR";
+    r.continuous = false;
+    r.interimResults = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    r.onresult = (e: any) => {
+      const transcript = String(e.results[0][0].transcript);
+      handleCommentChange(key, (currentComments[key] ? currentComments[key] + " " : "") + transcript);
+    };
+    r.onend = () => setListeningKey(null);
+    r.onerror = () => setListeningKey(null);
+    recognitionRef.current = r;
+    r.start();
+    setListeningKey(key);
+  }, [listeningKey, currentComments, handleCommentChange]);
 
   const handleSaveGlobalComment = async () => {
     if (!type || isReadOnly) return;
@@ -435,22 +467,47 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                               </div>
                             </div>
                             {/* Commentaire par critère */}
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-purple-500 flex items-center gap-1">
-                                💬 Commentaire — {child.description}
-                              </label>
-                              <textarea
-                                value={currentComments[`${comp.code}_${idx}`] || ""}
-                                onChange={(e) => handleCommentChange(`${comp.code}_${idx}`, e.target.value)}
-                                disabled={isReadOnly}
-                                placeholder={`Votre retour sur « ${child.description} » — axes d'amélioration, points forts…`}
-                                rows={2}
-                                className={cn(
-                                  "w-full text-sm rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-50 resize-none transition-colors",
-                                  isReadOnly && "opacity-60 cursor-not-allowed bg-slate-50"
-                                )}
-                              />
-                            </div>
+                            {(() => {
+                              const key = `${comp.code}_${idx}`;
+                              const isListening = listeningKey === key;
+                              return (
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-purple-500">
+                                      💬 Commentaire — {child.description}
+                                    </label>
+                                    {!isReadOnly && (
+                                      <button
+                                        type="button"
+                                        onClick={() => startVoice(key)}
+                                        title={isListening ? "Arrêter la dictée" : "Dicter un commentaire"}
+                                        className={cn(
+                                          "flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-black transition-all",
+                                          isListening
+                                            ? "bg-red-100 text-red-600 animate-pulse"
+                                            : "bg-purple-50 text-purple-500 hover:bg-purple-100"
+                                        )}
+                                      >
+                                        {isListening ? <MicOff size={12} /> : <Mic size={12} />}
+                                        {isListening ? "Stop" : "Dicter"}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <textarea
+                                    value={currentComments[key] || ""}
+                                    onChange={(e) => handleCommentChange(key, e.target.value)}
+                                    disabled={isReadOnly}
+                                    placeholder={`Votre retour sur « ${child.description} » — axes d'amélioration, points forts…`}
+                                    rows={2}
+                                    className={cn(
+                                      "w-full text-sm rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-50 resize-none transition-colors",
+                                      isListening && "border-red-300 ring-2 ring-red-50",
+                                      isReadOnly && "opacity-60 cursor-not-allowed bg-slate-50"
+                                    )}
+                                  />
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
