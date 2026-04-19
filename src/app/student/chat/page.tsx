@@ -366,7 +366,7 @@ export default function StudentChatPage() {
               variant="outline"
               className="bg-white border-slate-200 text-slate-500 font-bold px-3 py-1 rounded-full gap-2"
             >
-              <Sparkles size={12} className="text-indigo-500" /> Intelligence Gemini
+              <Sparkles size={12} className="text-indigo-500" /> Tuteur NDRC
             </Badge>
           </div>
         </header>
