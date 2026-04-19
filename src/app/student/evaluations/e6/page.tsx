@@ -53,7 +53,7 @@ type EvaluationPhase = "DIAGNOSTIC" | "FORMATIVE" | "PREPARATOIRE";
 type EvaluationDetail = StudentEvaluation & {
     phase: EvaluationPhase;
     plainComment: string | null;
-    gradeDetails: Array<{ criterionId: string; criterionLabel: string; score: number }>;
+    gradeDetails: Array<{ criterionId: string; criterionLabel: string; score: number; comment?: string }>;
     averageScore: number | null;
 };
 
@@ -67,26 +67,23 @@ function parseEvaluationGlobalComment(
     }
 
     try {
-        const parsed = JSON.parse(raw) as { grades?: Record<string, unknown>; globalComment?: string };
+        const parsed = JSON.parse(raw) as { grades?: Record<string, unknown>; comments?: Record<string, string>; globalComment?: string };
         const rawGrades = parsed?.grades;
+        const rawComments = parsed?.comments ?? {};
         const teacherComment = typeof parsed?.globalComment === "string" && parsed.globalComment.trim() ? parsed.globalComment.trim() : null;
         if (!rawGrades || typeof rawGrades !== "object" || Array.isArray(rawGrades)) {
             return { plainComment: teacherComment || raw, gradeDetails: [], averageScore: null };
         }
 
         const gradeDetails = Object.entries(rawGrades)
-            .map(([criterionId, value]) => {
+            .flatMap(([criterionId, value]) => {
                 const score = Number(value);
-                if (!Number.isFinite(score)) return null;
-
-                return {
-                    criterionId,
-                    criterionLabel: criterionMap[criterionId] || criterionId,
-                    score,
-                };
+                if (!Number.isFinite(score)) return [];
+                const comment = typeof rawComments[criterionId] === "string" && rawComments[criterionId].trim()
+                    ? rawComments[criterionId].trim() : undefined;
+                return [{ criterionId, criterionLabel: criterionMap[criterionId] || criterionId, score, comment }];
             })
-            .filter((item): item is { criterionId: string; criterionLabel: string; score: number } => Boolean(item))
-            .sort((a, b) => b.score - a.score || a.criterionLabel.localeCompare(b.criterionLabel, "fr-FR"));
+            .sort((a, b) => a.criterionLabel.localeCompare(b.criterionLabel, "fr-FR"));
 
         const averageScore =
             gradeDetails.length > 0
@@ -424,20 +421,22 @@ export default function StudentE6Page() {
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="space-y-2">
-                                                                {evaluation.gradeDetails.slice(0, 6).map((item) => (
-                                                                    <div key={item.criterionId} className="flex items-start justify-between gap-3 text-xs">
-                                                                        <span className="text-slate-700">{item.criterionLabel}</span>
-                                                                        <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black">
-                                                                            {item.score}/4
-                                                                        </span>
+                                                            <div className="space-y-3">
+                                                                {evaluation.gradeDetails.map((item) => (
+                                                                    <div key={item.criterionId} className="space-y-1">
+                                                                        <div className="flex items-start justify-between gap-3 text-xs">
+                                                                            <span className="text-slate-700 font-medium">{item.criterionLabel}</span>
+                                                                            <span className="shrink-0 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-black">
+                                                                                {item.score}/4
+                                                                            </span>
+                                                                        </div>
+                                                                        {item.comment && (
+                                                                            <p className="text-[11px] text-slate-500 italic bg-slate-100 rounded-md px-2 py-1">
+                                                                                💬 {item.comment}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
                                                                 ))}
-                                                                {evaluation.gradeDetails.length > 6 && (
-                                                                    <p className="text-[11px] text-slate-400 font-bold">
-                                                                        +{evaluation.gradeDetails.length - 6} autres critères
-                                                                    </p>
-                                                                )}
                                                             </div>
                                                         </div>
                                                     )}
