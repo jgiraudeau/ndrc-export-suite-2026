@@ -12,7 +12,18 @@ import {
 
 type StoredGradesPayload = {
   grades?: Record<string, number>;
+  comments?: Record<string, string>;
+  globalComment?: string;
 };
+
+function sanitizeComments(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof k === "string" && typeof v === "string") out[k] = v;
+  }
+  return out;
+}
 
 function sanitizeGrades(raw: unknown): Record<string, number> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -32,14 +43,17 @@ function sanitizeGrades(raw: unknown): Record<string, number> {
   return output;
 }
 
-function parseStoredGrades(globalComment: string | null): Record<string, number> {
-  if (!globalComment) return {};
-
+function parseStoredPayload(raw: string | null): { grades: Record<string, number>; comments: Record<string, string>; globalComment: string } {
+  if (!raw) return { grades: {}, comments: {}, globalComment: "" };
   try {
-    const parsed = JSON.parse(globalComment) as StoredGradesPayload;
-    return sanitizeGrades(parsed.grades);
+    const parsed = JSON.parse(raw) as StoredGradesPayload;
+    return {
+      grades: sanitizeGrades(parsed.grades),
+      comments: sanitizeComments(parsed.comments),
+      globalComment: typeof parsed.globalComment === "string" ? parsed.globalComment : "",
+    };
   } catch {
-    return {};
+    return { grades: {}, comments: {}, globalComment: "" };
   }
 }
 
@@ -81,11 +95,14 @@ export async function GET(request: NextRequest) {
     orderBy: { date: "desc" },
   });
 
+  const stored = parseStoredPayload(evaluation?.globalComment ?? null);
   return apiSuccess({
     studentId,
     examType,
     evaluationKind,
-    grades: parseStoredGrades(evaluation?.globalComment ?? null),
+    grades: stored.grades,
+    comments: stored.comments,
+    globalComment: stored.globalComment,
     isValidated: evaluation?.isValidated ?? false,
     validatedAt: evaluation?.validatedAt?.toISOString() ?? null,
   });
@@ -102,6 +119,8 @@ export async function POST(request: NextRequest) {
     typeof body?.evaluationKind === "string" ? body.evaluationKind : null
   );
   const grades = sanitizeGrades(body?.grades);
+  const comments = sanitizeComments(body?.comments);
+  const globalComment = typeof body?.globalComment === "string" ? body.globalComment : "";
 
   if (!studentId || !examType) {
     return apiError("Paramètres manquants: studentId et examType sont requis", 400);
@@ -109,7 +128,7 @@ export async function POST(request: NextRequest) {
 
   const searchTypes = buildSearchTypes(examType, evaluationKind);
   const evaluationType = buildEvaluationType(examType, evaluationKind);
-  const encodedGrades = JSON.stringify({ grades });
+  const encodedGrades = JSON.stringify({ grades, comments, globalComment });
 
   const existing = await prisma.evaluation.findFirst({
     where: {

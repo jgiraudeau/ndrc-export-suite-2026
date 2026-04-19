@@ -492,6 +492,8 @@ export async function apiGetEvaluationDraft(
         examType: "E4" | "E6";
         evaluationKind: EvaluationKind;
         grades: Record<string, number>;
+        comments: Record<string, string>;
+        globalComment: string;
         isValidated: boolean;
         validatedAt: string | null;
     }>(`/api/teacher/evaluations/draft?${query.toString()}`);
@@ -501,7 +503,9 @@ export async function apiSaveEvaluationDraft(
     studentId: string,
     examType: "E4" | "E6",
     evaluationKind: EvaluationKind,
-    grades: Record<string, number>
+    grades: Record<string, number>,
+    comments?: Record<string, string>,
+    globalComment?: string,
 ) {
     return apiFetch<{
         success: boolean;
@@ -511,6 +515,6 @@ export async function apiSaveEvaluationDraft(
         gradesCount: number;
     }>("/api/teacher/evaluations/draft", {
         method: "POST",
-        body: JSON.stringify({ studentId, examType, evaluationKind, grades }),
+        body: JSON.stringify({ studentId, examType, evaluationKind, grades, comments, globalComment }),
     });
 }

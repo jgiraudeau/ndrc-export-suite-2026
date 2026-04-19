@@ -46,12 +46,24 @@ interface ReferentialGridProps {
 export function ReferentialGrid({ studentId, referential, title, type, initialGrades = {}, readOnly = false, isValidated: initialIsValidated = false, validatedAt: initialValidatedAt = null }: ReferentialGridProps) {
   const [expandedCodes, setExpandedCodes] = useState<Record<string, boolean>>({});
   const [currentGrades, setCurrentGrades] = useState<Record<string, number>>(initialGrades);
+  const [currentComments, setCurrentComments] = useState<Record<string, string>>({});
+  const [globalComment, setGlobalComment] = useState("");
+  const [globalCommentDirty, setGlobalCommentDirty] = useState(false);
+  const [isSavingGlobal, setIsSavingGlobal] = useState(false);
   const [dirtyCodes, setDirtyCodes] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
   const [evaluationKind, setEvaluationKind] = useState<EvaluationKind>("FORMATIVE");
   const [draftGradesByKind, setDraftGradesByKind] = useState<Record<"PREPARATOIRE" | "CCF", Record<string, number>>>({
     PREPARATOIRE: {},
     CCF: {},
+  });
+  const [draftCommentsByKind, setDraftCommentsByKind] = useState<Record<"PREPARATOIRE" | "CCF", Record<string, string>>>({
+    PREPARATOIRE: {},
+    CCF: {},
+  });
+  const [draftGlobalCommentsByKind, setDraftGlobalCommentsByKind] = useState<Record<"PREPARATOIRE" | "CCF", string>>({
+    PREPARATOIRE: "",
+    CCF: "",
   });
   const [draftLoadedByKind, setDraftLoadedByKind] = useState<Record<"PREPARATOIRE" | "CCF", boolean>>({
     PREPARATOIRE: false,
@@ -92,6 +104,8 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
       if (draftLoadedByKind[evaluationKind]) {
         setCurrentGrades(draftGradesByKind[evaluationKind] || {});
+        setCurrentComments(draftCommentsByKind[evaluationKind] || {});
+        setGlobalComment(draftGlobalCommentsByKind[evaluationKind] || "");
         return;
       }
 
@@ -104,9 +118,19 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       if (!data) return;
 
       setCurrentGrades(data.grades || {});
+      setCurrentComments(data.comments || {});
+      setGlobalComment(data.globalComment || "");
       setDraftGradesByKind((prev) => ({
         ...prev,
         [evaluationKind]: data.grades || {},
+      }));
+      setDraftCommentsByKind((prev) => ({
+        ...prev,
+        [evaluationKind]: data.comments || {},
+      }));
+      setDraftGlobalCommentsByKind((prev) => ({
+        ...prev,
+        [evaluationKind]: data.globalComment || "",
       }));
       setDraftLoadedByKind((prev) => ({
         ...prev,
@@ -135,6 +159,25 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     setDirtyCodes(prev => new Set(prev).add(competencyCode));
   };
 
+  const handleCommentChange = (key: string, value: string) => {
+    if (isReadOnly) return;
+    setCurrentComments(prev => ({ ...prev, [key]: value }));
+    const competencyCode = key.replace(/_\d+$/, "");
+    setDirtyCodes(prev => new Set(prev).add(competencyCode));
+  };
+
+  const handleSaveGlobalComment = async () => {
+    if (!type || isReadOnly) return;
+    setIsSavingGlobal(true);
+    const gradesToPersist: Record<string, number> = {};
+    for (const [key, grade] of Object.entries(currentGrades)) {
+      if (typeof grade === "number" && grade >= 1 && grade <= 4) gradesToPersist[key] = grade;
+    }
+    await apiSaveEvaluationDraft(studentId, type, evaluationKind, gradesToPersist, currentComments, globalComment);
+    setGlobalCommentDirty(false);
+    setIsSavingGlobal(false);
+  };
+
   const handleSaveCompetency = async (competencyCode: string) => {
     setSavingId(competencyCode);
     
@@ -156,7 +199,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           const key = `${competencyCode}_${i}`;
           const grade = currentGrades[key];
           if (grade) {
-            await apiGradeCompetency(studentId, key, grade, `Évaluation ${type}`);
+            await apiGradeCompetency(studentId, key, grade, currentComments[key] || `Évaluation ${type}`);
           }
         }
       } else if (type) {
@@ -172,7 +215,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           studentId,
           type,
           evaluationKind,
-          gradesToPersist
+          gradesToPersist,
+          currentComments,
+          globalComment,
         );
         if (!error) {
           setDraftGradesByKind((prev) => ({
@@ -356,29 +401,43 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                             </div>
                           </div>
 
-                          <div className="lg:col-span-7 bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                              {GRADE_LEVELS.map((level) => {
-                                const isActive = currentGrade === level.value;
-                                return (
+                          <div className="lg:col-span-7 space-y-3">
+                            <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {GRADE_LEVELS.map((level) => {
+                                  const isActive = currentGrade === level.value;
+                                  return (
                                     <button
                                       key={level.value}
                                       onClick={() => handleGradeLocal(comp.code, idx, level.value)}
                                       disabled={isReadOnly}
                                       className={cn(
                                         "flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all h-20 text-center",
-                                        isActive 
+                                        isActive
                                           ? "ring-2 ring-purple-100 border-purple-300 " + level.color
                                           : "bg-slate-50/50 border-slate-100 text-slate-400 hover:border-slate-300 hover:text-slate-600",
                                         isReadOnly && !isActive && "opacity-30 grayscale cursor-not-allowed",
                                         isReadOnly && isActive && "cursor-default"
                                       )}
                                     >
-                                    <span className="text-[10px] font-black uppercase tracking-tight leading-none">{level.label}</span>
-                                  </button>
-                                );
-                              })}
+                                      <span className="text-[10px] font-black uppercase tracking-tight leading-none">{level.label}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
+                            {/* Commentaire par item */}
+                            <textarea
+                              value={currentComments[`${comp.code}_${idx}`] || ""}
+                              onChange={(e) => handleCommentChange(`${comp.code}_${idx}`, e.target.value)}
+                              disabled={isReadOnly}
+                              placeholder="Commentaire du formateur…"
+                              rows={2}
+                              className={cn(
+                                "w-full text-sm rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-50 resize-none transition-colors",
+                                isReadOnly && "opacity-60 cursor-not-allowed bg-slate-50"
+                              )}
+                            />
                           </div>
                         </div>
                       );
@@ -403,6 +462,35 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           </div>
         );
       })}
+
+      {/* ── Commentaire global de l'évaluation ──────────────── */}
+      {!readOnly && (
+        <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm p-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <Sparkles size={18} className="text-purple-500" />
+              Commentaire général — ensemble du référentiel
+            </h3>
+            {globalCommentDirty && (
+              <button
+                onClick={handleSaveGlobalComment}
+                disabled={isSavingGlobal}
+                className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2 rounded-xl font-black text-xs shadow hover:scale-105 transition-all disabled:opacity-50"
+              >
+                {isSavingGlobal ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                Enregistrer
+              </button>
+            )}
+          </div>
+          <textarea
+            value={globalComment}
+            onChange={(e) => { setGlobalComment(e.target.value); setGlobalCommentDirty(true); }}
+            placeholder="Observations générales sur l'ensemble de l'évaluation, points forts, axes d'amélioration…"
+            rows={4}
+            className="w-full text-sm rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-50 resize-none transition-colors"
+          />
+        </div>
+      )}
 
       {/* ── Certification Zone ───────────────────────────────── */}
       {!readOnly && type && evaluationKind === "CCF" && (
