@@ -175,24 +175,42 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
     if (!SR) { alert("Reconnaissance vocale non supportée sur ce navigateur (utilisez Chrome ou Safari)."); return; }
+
     if (listeningKey === key) {
       recognitionRef.current?.stop();
       setListeningKey(null);
       return;
     }
-    recognitionRef.current?.stop();
+    recognitionRef.current?.abort();
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const r = new SR() as any;
     r.lang = "fr-FR";
-    r.continuous = false;
+    r.continuous = true;
     r.interimResults = false;
+    let hasResult = false;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     r.onresult = (e: any) => {
-      const transcript = String(e.results[0][0].transcript);
-      handleCommentChange(key, (currentComments[key] ? currentComments[key] + " " : "") + transcript);
+      hasResult = true;
+      let transcript = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) transcript += e.results[i][0].transcript;
+      }
+      if (transcript) {
+        handleCommentChange(key, (currentComments[key] ? currentComments[key] + " " : "") + transcript.trim());
+      }
     };
-    r.onend = () => setListeningKey(null);
-    r.onerror = () => setListeningKey(null);
+    r.onend = () => {
+      if (!hasResult) console.warn("[Voice] Ended without result");
+      setListeningKey(null);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    r.onerror = (e: any) => {
+      console.error("[Voice] Error:", e.error);
+      if (e.error === "not-allowed") alert("Accès au microphone refusé. Autorisez le micro dans les paramètres du navigateur.");
+      setListeningKey(null);
+    };
     recognitionRef.current = r;
     r.start();
     setListeningKey(key);
