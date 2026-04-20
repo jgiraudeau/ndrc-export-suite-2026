@@ -148,11 +148,51 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluationKind, studentId, type]);
 
+  // Ref pour accéder aux dernières notes sans closure stale dans le debounce
+  const currentGradesRef = useRef(currentGrades);
+  useEffect(() => { currentGradesRef.current = currentGrades; }, [currentGrades]);
+  const currentCommentsRef = useRef(currentComments);
+  useEffect(() => { currentCommentsRef.current = currentComments; }, [currentComments]);
+  const globalCommentRef = useRef(globalComment);
+  useEffect(() => { globalCommentRef.current = globalComment; }, [globalComment]);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerAutoSave = useCallback((competencyCode: string) => {
+    if (!type) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      setSavingId(competencyCode);
+      setSaveError(null);
+      const grades = currentGradesRef.current;
+      const gradesToPersist: Record<string, number> = {};
+      for (const [k, v] of Object.entries(grades)) {
+        if (typeof v === "number" && v >= 1 && v <= 4) gradesToPersist[k] = v;
+      }
+      const kindToSave = evaluationKind;
+      if (kindToSave === "FORMATIVE") {
+        const competency = referential.find(c => c.code === competencyCode);
+        if (competency) {
+          for (let i = 0; i < competency.children.length; i++) {
+            const k = `${competencyCode}_${i}`;
+            if (grades[k]) apiGradeCompetency(studentId, k, grades[k], currentCommentsRef.current[k] || `Évaluation ${type}`).catch(() => {});
+          }
+        }
+      }
+      const { error } = await apiSaveEvaluationDraft(studentId, type, kindToSave, gradesToPersist, currentCommentsRef.current, globalCommentRef.current, {});
+      setSavingId(null);
+      if (error) { setSaveError("Erreur sauvegarde : " + error); return; }
+      setDirtyCodes((prev: Set<string>) => { const next = new Set(prev); next.delete(competencyCode); return next; });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    }, 600);
+  }, [type, evaluationKind, studentId, referential]);
+
   const handleGradeLocal = (competencyCode: string, childIdx: number, grade: number) => {
     if (isReadOnly) return;
     const key = `${competencyCode}_${childIdx}`;
     setCurrentGrades((prev: Record<string, number>) => ({ ...prev, [key]: grade }));
     setDirtyCodes((prev: Set<string>) => new Set(prev).add(competencyCode));
+    triggerAutoSave(competencyCode);
   };
 
   const handleCommentChange = (key: string, value: string) => {
@@ -243,65 +283,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     setIsSavingGlobal(false);
   };
 
-  const handleSaveCompetency = async (competencyCode: string) => {
-    setSavingId(competencyCode);
-    
-    // In a real scenario, we might want to save all children of this competency
-    // or the grid might have a different mapping. 
-    // Here we assume each grade level is a sub-progress or we save a composite state.
-    // For BTS NDRC NDRC, we usually save the full grid.
-    
-    // Mocking a sequential save for all modified children in this block
-    const competency = referential.find(c => c.code === competencyCode);
-    if (!competency) {
-      setSavingId(null);
-      return;
-    }
-
-    setSaveError(null);
-    try {
-      if (evaluationKind === "FORMATIVE") {
-        // Progress tracking (non-bloquant — ne pas avorter le save si ça échoue)
-        for (let i = 0; i < competency.children.length; i++) {
-          const key = `${competencyCode}_${i}`;
-          const grade = currentGrades[key];
-          if (grade) {
-            apiGradeCompetency(studentId, key, grade, currentComments[key] || `Évaluation ${type}`).catch(() => {});
-          }
-        }
-        if (type) {
-          const gradesToPersist: Record<string, number> = {};
-          for (const [key, grade] of Object.entries(currentGrades)) {
-            if (typeof grade === "number" && grade >= 1 && grade <= 4) gradesToPersist[key] = grade;
-          }
-          const { error } = await apiSaveEvaluationDraft(studentId, type, "FORMATIVE", gradesToPersist, currentComments, globalComment, {});
-          if (error) { setSaveError("Erreur sauvegarde évaluation : " + error); setSavingId(null); return; }
-        }
-      } else if (type) {
-        const gradesToPersist: Record<string, number> = {};
-        for (const [key, grade] of Object.entries(currentGrades)) {
-          if (typeof grade === "number" && grade >= 1 && grade <= 4) gradesToPersist[key] = grade;
-        }
-        const { error } = await apiSaveEvaluationDraft(studentId, type, evaluationKind, gradesToPersist, currentComments, globalComment, {});
-        if (error) {
-          setSaveError("Erreur sauvegarde : " + error);
-          setSavingId(null);
-          return;
-        }
-        setDraftGradesByKind((prev: Record<"PREPARATOIRE" | "CCF", Record<string, number>>) => ({ ...prev, [evaluationKind]: gradesToPersist }));
-        setDraftLoadedByKind((prev: Record<"PREPARATOIRE" | "CCF", boolean>) => ({ ...prev, [evaluationKind]: true }));
-      }
-
-      setDirtyCodes((prev: Set<string>) => { const next = new Set(prev); next.delete(competencyCode); return next; });
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
-    } catch (err) {
-      console.error("Failed to save grades", err);
-      setSaveError("Erreur inattendue lors de la sauvegarde.");
-    } finally {
-      setSavingId(null);
-    }
-  };
 
   const isAllGraded = useMemo(() => {
     return referential.every(comp => 
@@ -440,15 +421,10 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                   {isExpanded ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}
                 </div>
               </button>
-              {isDirty && !isReadOnly && (
-                <button
-                  onClick={() => handleSaveCompetency(comp.code)}
-                  disabled={isSaving}
-                  className="absolute right-16 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-xs shadow hover:scale-105 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {isSaving ? <Loader2 className="animate-spin" size={13} /> : <Save size={13} />}
-                  Sauvegarder
-                </button>
+              {isSaving && (
+                <div className="absolute right-16 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-purple-600 text-xs font-black">
+                  <Loader2 className="animate-spin" size={13} /> Sauvegarde…
+                </div>
               )}
             </div>
 
@@ -557,16 +533,11 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                       );
                     })}
 
-                    {isDirty && !isReadOnly && (
+                    {isDirty && (
                       <div className="flex justify-end pt-4 border-t border-slate-100">
-                        <button 
-                            onClick={() => handleSaveCompetency(comp.code)}
-                            disabled={isSaving}
-                            className="flex items-center gap-2 bg-gradient-to-r from-slate-800 to-slate-900 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl hover:scale-105 transition-all active:scale-95 disabled:opacity-50"
-                        >
-                          {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                          Valider ce bloc
-                        </button>
+                        <span className="flex items-center gap-2 text-orange-500 text-xs font-black">
+                          <Loader2 className="animate-spin" size={14} /> Sauvegarde automatique en cours…
+                        </span>
                       </div>
                     )}
                   </div>
