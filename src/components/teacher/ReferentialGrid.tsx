@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -83,6 +83,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [loadingKindData, setLoadingKindData] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [listeningKey, setListeningKey] = useState<string | null>(null);
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
@@ -207,7 +208,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         setDirtyCodes((prev: Set<string>) => new Set(prev).add(code));
       }
       // Forcer un re-render pour afficher l'interim
-      if (interimText) setListeningKey((k: string | null) => k);
+      if (interimText) forceUpdate();
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     r.onerror = (e: any) => {
@@ -228,7 +229,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     r.start();
 
     setListeningKey(key);
-  }, [listeningKey, currentComments, handleCommentChange]);
+  }, [listeningKey]);
 
   const handleSaveGlobalComment = async () => {
     if (!type || isReadOnly) return;
@@ -434,9 +435,16 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">{comp.block} — {comp.children.length} ÉLÉMENTS DE COMPÉTENCE</p>
                 </div>
               </div>
-                <div className="flex items-center gap-4">
-                {isDirty && !isExpanded && (
-                    <span className="flex h-3 w-3 rounded-full bg-orange-500 animate-pulse" />
+                <div className="flex items-center gap-3">
+                {isDirty && !isReadOnly && (
+                    <button
+                      onClick={(e: { stopPropagation: () => void }) => { e.stopPropagation(); handleSaveCompetency(comp.code); }}
+                      disabled={isSaving}
+                      className="flex items-center gap-1.5 bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-xs shadow hover:scale-105 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {isSaving ? <Loader2 className="animate-spin" size={13} /> : <Save size={13} />}
+                      Sauvegarder
+                    </button>
                 )}
                 {isExpanded ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}
               </div>
