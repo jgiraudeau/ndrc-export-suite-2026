@@ -11,8 +11,6 @@ import {
   ShieldCheck,
   Mic,
   MicOff,
-  Play,
-  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -56,6 +54,8 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [isSavingGlobal, setIsSavingGlobal] = useState(false);
   const [dirtyCodes, setDirtyCodes] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [evaluationKind, setEvaluationKind] = useState<EvaluationKind>("FORMATIVE");
   const [draftGradesByKind, setDraftGradesByKind] = useState<Record<"PREPARATOIRE" | "CCF", Record<string, number>>>({
     PREPARATOIRE: {},
@@ -80,17 +80,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   });
   const [loadingKindData, setLoadingKindData] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [currentAudioComments, setCurrentAudioComments] = useState<Record<string, string>>({});
-  const [draftAudioCommentsByKind, setDraftAudioCommentsByKind] = useState<Record<"PREPARATOIRE" | "CCF", Record<string, string>>>({
-    PREPARATOIRE: {},
-    CCF: {},
-  });
   const [listeningKey, setListeningKey] = useState<string | null>(null);
-  const [uploadingAudioKey, setUploadingAudioKey] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   const isValidated = validationByKind[evaluationKind].isValidated;
   const validatedAt = validationByKind[evaluationKind].validatedAt;
@@ -110,17 +102,21 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     let cancelled = false;
 
     async function syncKindData() {
+      if (!type) return;
+
       if (evaluationKind === "FORMATIVE") {
-        setCurrentGrades(initialGrades);
+        // Charger les commentaires depuis le draft (les notes viennent de initialGrades)
+        const { data } = await apiGetEvaluationDraft(studentId, type, "FORMATIVE");
+        if (cancelled) return;
+        setCurrentGrades(data?.grades && Object.keys(data.grades).length > 0 ? data.grades : initialGrades);
+        setCurrentComments(data?.comments || {});
+        setGlobalComment(data?.globalComment || "");
         return;
       }
-
-      if (!type) return;
 
       if (draftLoadedByKind[evaluationKind]) {
         setCurrentGrades(draftGradesByKind[evaluationKind] || {});
         setCurrentComments(draftCommentsByKind[evaluationKind] || {});
-        setCurrentAudioComments(draftAudioCommentsByKind[evaluationKind] || {});
         setGlobalComment(draftGlobalCommentsByKind[evaluationKind] || "");
         return;
       }
@@ -135,7 +131,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
       setCurrentGrades(data.grades || {});
       setCurrentComments(data.comments || {});
-      setCurrentAudioComments(data.audioComments || {});
       setGlobalComment(data.globalComment || "");
       setDraftGradesByKind((prev) => ({
         ...prev,
@@ -144,10 +139,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       setDraftCommentsByKind((prev) => ({
         ...prev,
         [evaluationKind]: data.comments || {},
-      }));
-      setDraftAudioCommentsByKind((prev) => ({
-        ...prev,
-        [evaluationKind]: data.audioComments || {},
       }));
       setDraftGlobalCommentsByKind((prev) => ({
         ...prev,
@@ -187,97 +178,52 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     setDirtyCodes(prev => new Set(prev).add(competencyCode));
   };
 
-  const startRecording = useCallback(async (key: string) => {
+  const startRecording = useCallback((key: string) => {
     if (listeningKey === key) {
       recognitionRef.current?.stop();
-      mediaRecorderRef.current?.stop();
       setListeningKey(null);
       return;
     }
 
     recognitionRef.current?.abort();
-    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
 
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      alert("Accès au microphone refusé. Autorisez le micro dans les paramètres du navigateur.");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      alert("La reconnaissance vocale n'est pas supportée par ce navigateur. Utilisez Chrome ou Edge.");
       return;
     }
 
-    audioChunksRef.current = [];
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : MediaRecorder.isTypeSupported("audio/webm")
-      ? "audio/webm"
-      : MediaRecorder.isTypeSupported("audio/mp4")
-      ? "audio/mp4"
-      : "";
-
-    const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-
-    mr.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunksRef.current.push(e.data);
-    };
-
-    mr.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || "audio/webm" });
-      if (blob.size < 100) return;
-
-      setUploadingAudioKey(key);
-      try {
-        const ext = (mr.mimeType || "audio/webm").split("/")[1]?.split(";")[0] ?? "webm";
-        const formData = new FormData();
-        formData.append("audio", blob, `comment-${key}-${Date.now()}.${ext}`);
-        const res = await fetch("/api/teacher/evaluations/audio-upload", {
-          method: "POST",
-          body: formData,
-        });
-        if (res.ok) {
-          const json = await res.json() as { url?: string };
-          if (json.url) {
-            setCurrentAudioComments((prev) => ({ ...prev, [key]: json.url as string }));
-            const competencyCode = key.replace(/_\d+$/, "");
-            setDirtyCodes((prev) => new Set(prev).add(competencyCode));
-          }
-        }
-      } catch (err) {
-        console.error("[Audio upload]", err);
-      } finally {
-        setUploadingAudioKey(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = new SR() as any;
+    r.lang = "fr-FR";
+    r.continuous = true;
+    r.interimResults = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    r.onresult = (e: any) => {
+      let transcript = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) transcript += e.results[i][0].transcript;
+      }
+      if (transcript) {
+        handleCommentChange(key, (currentComments[key] ? currentComments[key] + " " : "") + transcript.trim());
       }
     };
-
-    mr.start();
-    mediaRecorderRef.current = mr;
-
-    // Transcription en parallèle via Web Speech API si dispo
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-    if (SR) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const r = new SR() as any;
-      r.lang = "fr-FR";
-      r.continuous = true;
-      r.interimResults = false;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      r.onresult = (e: any) => {
-        let transcript = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) transcript += e.results[i][0].transcript;
-        }
-        if (transcript) {
-          handleCommentChange(key, (currentComments[key] ? currentComments[key] + " " : "") + transcript.trim());
-        }
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      r.onerror = (e: any) => console.warn("[Speech]", e.error);
-      r.onend = () => setListeningKey(null);
-      recognitionRef.current = r;
-      r.start();
-    }
+    r.onerror = (e: any) => {
+      console.warn("[Speech]", e.error);
+      if (e.error === "not-allowed" || e.error === "permission-denied") {
+        setSaveError("Microphone non autorisé. Autorisez l'accès dans les paramètres du navigateur.");
+      } else if (e.error === "no-speech") {
+        setSaveError("Aucune voix détectée. Réessayez.");
+      } else {
+        setSaveError("Reconnaissance vocale impossible : " + e.error);
+      }
+      setListeningKey(null);
+    };
+    r.onend = () => setListeningKey(null);
+    recognitionRef.current = r;
+    r.start();
 
     setListeningKey(key);
   }, [listeningKey, currentComments, handleCommentChange]);
@@ -289,7 +235,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     for (const [key, grade] of Object.entries(currentGrades)) {
       if (typeof grade === "number" && grade >= 1 && grade <= 4) gradesToPersist[key] = grade;
     }
-    await apiSaveEvaluationDraft(studentId, type, evaluationKind, gradesToPersist, currentComments, globalComment, currentAudioComments);
+    await apiSaveEvaluationDraft(studentId, type, evaluationKind, gradesToPersist, currentComments, globalComment, {});
     setGlobalCommentDirty(false);
     setIsSavingGlobal(false);
   };
@@ -309,64 +255,46 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       return;
     }
 
+    setSaveError(null);
     try {
       if (evaluationKind === "FORMATIVE") {
         for (let i = 0; i < competency.children.length; i++) {
           const key = `${competencyCode}_${i}`;
           const grade = currentGrades[key];
           if (grade) {
-            await apiGradeCompetency(studentId, key, grade, currentComments[key] || `Évaluation ${type}`);
+            const { error } = await apiGradeCompetency(studentId, key, grade, currentComments[key] || `Évaluation ${type}`);
+            if (error) { setSaveError("Erreur sauvegarde note : " + error); setSavingId(null); return; }
           }
         }
-        // Also persist to Evaluation table so the student can see the assessment
         if (type) {
           const gradesToPersist: Record<string, number> = {};
           for (const [key, grade] of Object.entries(currentGrades)) {
             if (typeof grade === "number" && grade >= 1 && grade <= 4) gradesToPersist[key] = grade;
           }
-          await apiSaveEvaluationDraft(studentId, type, "FORMATIVE", gradesToPersist, currentComments, globalComment, currentAudioComments);
+          const { error } = await apiSaveEvaluationDraft(studentId, type, "FORMATIVE", gradesToPersist, currentComments, globalComment, {});
+          if (error) { setSaveError("Erreur sauvegarde évaluation : " + error); setSavingId(null); return; }
         }
       } else if (type) {
         const gradesToPersist: Record<string, number> = {};
-
         for (const [key, grade] of Object.entries(currentGrades)) {
-          if (typeof grade === "number" && grade >= 1 && grade <= 4) {
-            gradesToPersist[key] = grade;
-          }
+          if (typeof grade === "number" && grade >= 1 && grade <= 4) gradesToPersist[key] = grade;
         }
-
-        const { error } = await apiSaveEvaluationDraft(
-          studentId,
-          type,
-          evaluationKind,
-          gradesToPersist,
-          currentComments,
-          globalComment,
-          currentAudioComments,
-        );
-        if (!error) {
-          setDraftGradesByKind((prev) => ({
-            ...prev,
-            [evaluationKind]: gradesToPersist,
-          }));
-          setDraftAudioCommentsByKind((prev) => ({
-            ...prev,
-            [evaluationKind]: currentAudioComments,
-          }));
-          setDraftLoadedByKind((prev) => ({
-            ...prev,
-            [evaluationKind]: true,
-          }));
+        const { error } = await apiSaveEvaluationDraft(studentId, type, evaluationKind, gradesToPersist, currentComments, globalComment, {});
+        if (error) {
+          setSaveError("Erreur sauvegarde : " + error);
+          setSavingId(null);
+          return;
         }
+        setDraftGradesByKind((prev: Record<"PREPARATOIRE" | "CCF", Record<string, number>>) => ({ ...prev, [evaluationKind]: gradesToPersist }));
+        setDraftLoadedByKind((prev: Record<"PREPARATOIRE" | "CCF", boolean>) => ({ ...prev, [evaluationKind]: true }));
       }
 
-      setDirtyCodes((prev) => {
-        const next = new Set(prev);
-        next.delete(competencyCode);
-        return next;
-      });
+      setDirtyCodes((prev) => { const next = new Set(prev); next.delete(competencyCode); return next; });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
       console.error("Failed to save grades", err);
+      setSaveError("Erreur inattendue lors de la sauvegarde.");
     } finally {
       setSavingId(null);
     }
@@ -404,6 +332,17 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
   return (
     <div className="space-y-6">
+      {saveError && (
+        <div className="flex items-center justify-between gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-3 text-sm font-bold">
+          <span>⚠ {saveError}</span>
+          <button onClick={() => setSaveError(null)} className="text-red-400 hover:text-red-600 font-black text-lg leading-none">×</button>
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="bg-green-50 border border-green-200 text-green-700 rounded-2xl px-5 py-3 text-sm font-bold">
+          ✓ Sauvegardé — visible par l&apos;étudiant
+        </div>
+      )}
       {title && (
         <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">{title}</h2>
@@ -559,8 +498,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                             {(() => {
                               const key = `${comp.code}_${idx}`;
                               const isListening = listeningKey === key;
-                              const isUploading = uploadingAudioKey === key;
-                              const audioUrl = currentAudioComments[key];
                               return (
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
@@ -570,24 +507,19 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                     {!isReadOnly && (
                                       <button
                                         type="button"
-                                        onClick={() => void startRecording(key)}
-                                        disabled={isUploading}
-                                        title={isListening ? "Arrêter l'enregistrement" : "Enregistrer un commentaire vocal"}
+                                        onClick={() => startRecording(key)}
+                                        title={isListening ? "Arrêter la dictée" : "Dicter un commentaire"}
                                         className={cn(
                                           "flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-black transition-all",
                                           isListening
                                             ? "bg-red-100 text-red-600 animate-pulse"
-                                            : isUploading
-                                            ? "bg-slate-100 text-slate-400 cursor-wait"
                                             : "bg-purple-50 text-purple-500 hover:bg-purple-100"
                                         )}
                                       >
-                                        {isUploading ? (
-                                          <><Loader2 size={12} className="animate-spin" /> Upload…</>
-                                        ) : isListening ? (
+                                        {isListening ? (
                                           <><MicOff size={12} /> Stop</>
                                         ) : (
-                                          <><Mic size={12} /> Enregistrer</>
+                                          <><Mic size={12} /> Dicter</>
                                         )}
                                       </button>
                                     )}
@@ -605,31 +537,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                       isReadOnly && "opacity-60 cursor-not-allowed bg-slate-50"
                                     )}
                                   />
-
-                                  {audioUrl && (
-                                    <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-2xl px-3 py-2">
-                                      <Play size={12} className="text-purple-500 shrink-0" />
-                                      <audio controls src={audioUrl} className="h-8 flex-1 min-w-0" />
-                                      {!isReadOnly && (
-                                        <button
-                                          type="button"
-                                          title="Supprimer l'audio"
-                                          onClick={() => {
-                                            setCurrentAudioComments((prev) => {
-                                              const next = { ...prev };
-                                              delete next[key];
-                                              return next;
-                                            });
-                                            const competencyCode = key.replace(/_\d+$/, "");
-                                            setDirtyCodes((prev) => new Set(prev).add(competencyCode));
-                                          }}
-                                          className="text-rose-400 hover:text-rose-600 transition-colors shrink-0"
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
                                 </div>
                               );
                             })()}
