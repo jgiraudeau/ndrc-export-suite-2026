@@ -419,36 +419,38 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
             "bg-white rounded-[32px] border transition-all duration-300 overflow-hidden",
             isExpanded ? "border-purple-200 shadow-xl shadow-purple-50/50" : "border-slate-200 shadow-sm hover:border-slate-300"
           )}>
-            <button 
-              onClick={() => toggleExpand(comp.code)}
-              className="w-full p-6 md:p-8 flex items-center justify-between hover:bg-slate-50/50 transition-colors text-left group"
-            >
-              <div className="flex items-center gap-6">
-                <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black transition-all",
-                    isExpanded ? "bg-purple-600 text-white shadow-lg shadow-purple-200" : "bg-slate-100 text-slate-500 group-hover:bg-purple-100 group-hover:text-purple-600"
-                )}>
-                  {comp.code.split('.')[1] || comp.code}
+            <div className="relative">
+              <button
+                onClick={() => toggleExpand(comp.code)}
+                className="w-full p-6 md:p-8 flex items-center justify-between hover:bg-slate-50/50 transition-colors text-left group"
+              >
+                <div className="flex items-center gap-6">
+                  <div className={cn(
+                      "w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black transition-all",
+                      isExpanded ? "bg-purple-600 text-white shadow-lg shadow-purple-200" : "bg-slate-100 text-slate-500 group-hover:bg-purple-100 group-hover:text-purple-600"
+                  )}>
+                    {comp.code.split('.')[1] || comp.code}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-purple-700 transition-colors">{comp.description}</h3>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">{comp.block} — {comp.children.length} ÉLÉMENTS DE COMPÉTENCE</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 text-lg leading-tight group-hover:text-purple-700 transition-colors">{comp.description}</h3>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">{comp.block} — {comp.children.length} ÉLÉMENTS DE COMPÉTENCE</p>
+                <div className="flex items-center gap-3 pr-1">
+                  {isExpanded ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}
                 </div>
-              </div>
-                <div className="flex items-center gap-3">
-                {isDirty && !isReadOnly && (
-                    <button
-                      onClick={(e: { stopPropagation: () => void }) => { e.stopPropagation(); handleSaveCompetency(comp.code); }}
-                      disabled={isSaving}
-                      className="flex items-center gap-1.5 bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-xs shadow hover:scale-105 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      {isSaving ? <Loader2 className="animate-spin" size={13} /> : <Save size={13} />}
-                      Sauvegarder
-                    </button>
-                )}
-                {isExpanded ? <ChevronUp className="text-slate-300" /> : <ChevronDown className="text-slate-300" />}
-              </div>
-            </button>
+              </button>
+              {isDirty && !isReadOnly && (
+                <button
+                  onClick={() => handleSaveCompetency(comp.code)}
+                  disabled={isSaving}
+                  className="absolute right-16 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-xs shadow hover:scale-105 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="animate-spin" size={13} /> : <Save size={13} />}
+                  Sauvegarder
+                </button>
+              )}
+            </div>
 
             <AnimatePresence>
               {isExpanded && (
