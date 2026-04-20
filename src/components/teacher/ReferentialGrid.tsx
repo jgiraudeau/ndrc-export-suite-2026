@@ -260,9 +260,13 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       // no-speech = timeout Chrome sans voix détectée → relance automatique
     };
     r.onend = () => {
-      // Si le micro est toujours actif (listeningKey encore défini), relancer
       if (recognitionRef.current === r) {
-        try { r.start(); } catch { setListeningKey(null); }
+        // Délai obligatoire : Chrome lance InvalidStateError si on rappelle start() trop tôt
+        setTimeout(() => {
+          if (recognitionRef.current === r) {
+            try { r.start(); } catch { setListeningKey(null); }
+          }
+        }, 300);
       }
     };
     recognitionRef.current = r;
