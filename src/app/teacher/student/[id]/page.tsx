@@ -4,13 +4,13 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-    CheckCircle2, BookOpen, Save, Loader2, User, FileDown, ClipboardList
+    CheckCircle2, BookOpen, Save, Loader2, User, FileDown, ClipboardList, MessageSquarePlus, Send, Trash2
 } from "lucide-react";
 import { ALL_COMPETENCIES } from "@/data/competencies";
 import { ReferentialGrid } from "@/components/teacher/ReferentialGrid";
 import E4_DATA from "../../../../../prisma/referentiel_e4.json";
 import E6_DATA from "../../../../../prisma/referentiel_e6.json";
-import { apiGetStudent, apiGradeCompetency, apiGetExperiences, apiGetJournal, type StudentWithProgress, type ProfessionalExperience } from "@/lib/api-client";
+import { apiGetStudent, apiGradeCompetency, apiGetExperiences, apiGetJournal, apiAddComment, apiDeleteComment, type StudentWithProgress, type ProfessionalExperience } from "@/lib/api-client";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
 import { PDFService } from "@/lib/pdf-service";
 import { DOCXService } from "@/lib/docx-service";
@@ -69,6 +69,25 @@ export default function StudentDetailPage() {
     const [gradeInputs, setGradeInputs] = useState<Record<string, { teacherStatus: number; teacherFeedback: string }>>({});
     const [savingId, setSavingId] = useState<string | null>(null);
     const [savedId, setSavedId] = useState<string | null>(null);
+
+    // Commentaires
+    const [commentInput, setCommentInput] = useState("");
+    const [sendingComment, setSendingComment] = useState(false);
+
+    const handleSendComment = async () => {
+        if (!studentId || !commentInput.trim()) return;
+        setSendingComment(true);
+        const { data, error } = await apiAddComment(studentId, commentInput.trim());
+        setSendingComment(false);
+        if (error || !data) return;
+        setCommentInput("");
+        setStudent(prev => prev ? { ...prev, comments: [data, ...prev.comments] } : prev);
+    };
+
+    const handleDeleteComment = async (commentId: string) => {
+        await apiDeleteComment(commentId);
+        setStudent(prev => prev ? { ...prev, comments: prev.comments.filter(c => c.id !== commentId) } : prev);
+    };
 
     const fetchStudent = useCallback(async () => {
         if (!studentId) return;
@@ -593,6 +612,54 @@ export default function StudentDetailPage() {
                         />
                     </div>
                 )}
+
+                {/* Commentaires formateur */}
+                <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm p-8">
+                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2 mb-5">
+                        <MessageSquarePlus size={16} className="text-purple-500" />
+                        Commentaires formateur
+                        {student.comments.length > 0 && (
+                            <span className="ml-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black">{student.comments.length}</span>
+                        )}
+                    </h3>
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1 mb-4">
+                        {student.comments.length === 0 ? (
+                            <p className="text-slate-400 text-xs italic">Aucun commentaire pour cet étudiant.</p>
+                        ) : student.comments.map(c => (
+                            <div key={c.id} className="flex items-start gap-3 bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-slate-700 font-medium leading-relaxed">{c.text}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wide">
+                                        {c.authorName} · {new Date(c.date).toLocaleDateString("fr-FR")}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => handleDeleteComment(c.id)}
+                                    className="text-slate-300 hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
+                                >
+                                    <Trash2 size={13} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Ajouter un commentaire..."
+                            value={commentInput}
+                            onChange={e => setCommentInput(e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && handleSendComment()}
+                            className="flex-1 text-xs px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-purple-400 bg-slate-50"
+                        />
+                        <button
+                            onClick={handleSendComment}
+                            disabled={sendingComment || !commentInput.trim()}
+                            className="bg-purple-600 text-white px-4 py-2 rounded-xl hover:bg-purple-700 disabled:opacity-30 transition-colors flex items-center gap-1.5"
+                        >
+                            {sendingComment ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        </button>
+                    </div>
+                </div>
 
             </div>
         </TeacherLayout>
