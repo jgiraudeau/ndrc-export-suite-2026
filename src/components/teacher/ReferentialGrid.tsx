@@ -73,6 +73,8 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     PREPARATOIRE: false,
     CCF: false,
   });
+  const formativeLoadedRef = useRef(false);
+  const interimRef = useRef<Record<string, string>>({});
   const [validationByKind, setValidationByKind] = useState<Record<EvaluationKind, { isValidated: boolean; validatedAt: string | null }>>({
     FORMATIVE: { isValidated: false, validatedAt: null },
     PREPARATOIRE: { isValidated: false, validatedAt: null },
@@ -98,71 +100,52 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     { value: 4, label: "Très satisfaisant", color: "bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100" },
   ];
 
+  // Chargement FORMATIVE une seule fois au montage (ne touche pas les notes déjà en mémoire)
   useEffect(() => {
+    if (!type || formativeLoadedRef.current) return;
+    formativeLoadedRef.current = true;
     let cancelled = false;
-
-    async function syncKindData() {
-      if (!type) return;
-
-      if (evaluationKind === "FORMATIVE") {
-        // Charger les commentaires depuis le draft (les notes viennent de initialGrades)
-        const { data } = await apiGetEvaluationDraft(studentId, type, "FORMATIVE");
-        if (cancelled) return;
-        setCurrentGrades(data?.grades && Object.keys(data.grades).length > 0 ? data.grades : initialGrades);
-        setCurrentComments(data?.comments || {});
-        setGlobalComment(data?.globalComment || "");
-        return;
+    apiGetEvaluationDraft(studentId, type, "FORMATIVE").then(({ data }) => {
+      if (cancelled || !data) return;
+      if (data.grades && Object.keys(data.grades).length > 0) {
+        setCurrentGrades(data.grades);
       }
-
-      if (draftLoadedByKind[evaluationKind]) {
-        setCurrentGrades(draftGradesByKind[evaluationKind] || {});
-        setCurrentComments(draftCommentsByKind[evaluationKind] || {});
-        setGlobalComment(draftGlobalCommentsByKind[evaluationKind] || "");
-        return;
+      if (data.comments && Object.keys(data.comments).length > 0) {
+        setCurrentComments(data.comments);
       }
+      if (data.globalComment) setGlobalComment(data.globalComment);
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, type]);
 
-      setLoadingKindData(true);
-      const { data } = await apiGetEvaluationDraft(studentId, type, evaluationKind);
+  // Chargement PREPARATOIRE / CCF quand l'onglet change
+  useEffect(() => {
+    if (evaluationKind === "FORMATIVE" || !type) return;
+    if (draftLoadedByKind[evaluationKind]) {
+      setCurrentGrades(draftGradesByKind[evaluationKind] || {});
+      setCurrentComments(draftCommentsByKind[evaluationKind] || {});
+      setGlobalComment(draftGlobalCommentsByKind[evaluationKind] || "");
+      return;
+    }
+    let cancelled = false;
+    setLoadingKindData(true);
+    apiGetEvaluationDraft(studentId, type, evaluationKind).then(({ data }) => {
       if (cancelled) return;
-
       setLoadingKindData(false);
-
       if (!data) return;
-
       setCurrentGrades(data.grades || {});
       setCurrentComments(data.comments || {});
       setGlobalComment(data.globalComment || "");
-      setDraftGradesByKind((prev) => ({
-        ...prev,
-        [evaluationKind]: data.grades || {},
-      }));
-      setDraftCommentsByKind((prev) => ({
-        ...prev,
-        [evaluationKind]: data.comments || {},
-      }));
-      setDraftGlobalCommentsByKind((prev) => ({
-        ...prev,
-        [evaluationKind]: data.globalComment || "",
-      }));
-      setDraftLoadedByKind((prev) => ({
-        ...prev,
-        [evaluationKind]: true,
-      }));
-      setValidationByKind((prev) => ({
-        ...prev,
-        [evaluationKind]: {
-          isValidated: data.isValidated,
-          validatedAt: data.validatedAt,
-        },
-      }));
-    }
-
-    void syncKindData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [draftGradesByKind, draftLoadedByKind, evaluationKind, initialGrades, studentId, type]);
+      setDraftGradesByKind((prev: Record<"PREPARATOIRE"|"CCF", Record<string,number>>) => ({ ...prev, [evaluationKind]: data.grades || {} }));
+      setDraftCommentsByKind((prev: Record<"PREPARATOIRE"|"CCF", Record<string,string>>) => ({ ...prev, [evaluationKind]: data.comments || {} }));
+      setDraftGlobalCommentsByKind((prev: Record<"PREPARATOIRE"|"CCF", string>) => ({ ...prev, [evaluationKind]: data.globalComment || "" }));
+      setDraftLoadedByKind((prev: Record<"PREPARATOIRE"|"CCF", boolean>) => ({ ...prev, [evaluationKind]: true }));
+      setValidationByKind((prev: Record<EvaluationKind, { isValidated: boolean; validatedAt: string | null }>) => ({ ...prev, [evaluationKind]: { isValidated: data.isValidated, validatedAt: data.validatedAt } }));
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluationKind, studentId, type]);
 
   const handleGradeLocal = (competencyCode: string, childIdx: number, grade: number) => {
     if (isReadOnly) return;
@@ -202,16 +185,29 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     const r = new SR() as any;
     r.lang = "fr-FR";
     r.continuous = true;
-    r.interimResults = false;
+    r.interimResults = true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     r.onresult = (e: any) => {
-      let transcript = "";
+      let finalText = "";
+      let interimText = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) transcript += e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+        else interimText += e.results[i][0].transcript;
       }
-      if (transcript) {
-        handleCommentChange(key, (currentComments[key] ? currentComments[key] + " " : "") + transcript.trim());
+      // Interim : stocker dans le ref pour affichage live
+      if (interimText) interimRef.current[key] = interimText;
+      // Final : fusionner avec le commentaire existant (via setState fonctionnel = pas de closure stale)
+      if (finalText) {
+        interimRef.current[key] = "";
+        setCurrentComments((prev: Record<string, string>) => {
+          const base = prev[key] ? prev[key] + " " : "";
+          return { ...prev, [key]: base + finalText.trim() };
+        });
+        const code = key.replace(/_\d+$/, "");
+        setDirtyCodes((prev: Set<string>) => new Set(prev).add(code));
       }
+      // Forcer un re-render pour afficher l'interim
+      if (interimText) setListeningKey((k: string | null) => k);
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     r.onerror = (e: any) => {
@@ -532,7 +528,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                   </div>
 
                                   <textarea
-                                    value={currentComments[key] || ""}
+                                    value={(currentComments[key] || "") + (interimRef.current[key] ? " " + interimRef.current[key] : "")}
                                     onChange={(e) => handleCommentChange(key, e.target.value)}
                                     disabled={isReadOnly}
                                     placeholder={`Votre retour sur « ${child.description} » — axes d'amélioration, points forts…`}
