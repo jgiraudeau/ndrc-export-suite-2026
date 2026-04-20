@@ -91,7 +91,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const validatedAt = validationByKind[evaluationKind].validatedAt;
 
   const toggleExpand = (code: string) => {
-    setExpandedCodes(prev => ({ ...prev, [code]: !prev[code] }));
+    setExpandedCodes((prev: Record<string, boolean>) => ({ ...prev, [code]: !prev[code] }));
   };
 
   const GRADE_LEVELS = [
@@ -151,15 +151,15 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const handleGradeLocal = (competencyCode: string, childIdx: number, grade: number) => {
     if (isReadOnly) return;
     const key = `${competencyCode}_${childIdx}`;
-    setCurrentGrades(prev => ({ ...prev, [key]: grade }));
-    setDirtyCodes(prev => new Set(prev).add(competencyCode));
+    setCurrentGrades((prev: Record<string, number>) => ({ ...prev, [key]: grade }));
+    setDirtyCodes((prev: Set<string>) => new Set(prev).add(competencyCode));
   };
 
   const handleCommentChange = (key: string, value: string) => {
     if (isReadOnly) return;
-    setCurrentComments(prev => ({ ...prev, [key]: value }));
+    setCurrentComments((prev: Record<string, string>) => ({ ...prev, [key]: value }));
     const competencyCode = key.replace(/_\d+$/, "");
-    setDirtyCodes(prev => new Set(prev).add(competencyCode));
+    setDirtyCodes((prev: Set<string>) => new Set(prev).add(competencyCode));
   };
 
   const startRecording = useCallback((key: string) => {
@@ -261,12 +261,12 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     setSaveError(null);
     try {
       if (evaluationKind === "FORMATIVE") {
+        // Progress tracking (non-bloquant — ne pas avorter le save si ça échoue)
         for (let i = 0; i < competency.children.length; i++) {
           const key = `${competencyCode}_${i}`;
           const grade = currentGrades[key];
           if (grade) {
-            const { error } = await apiGradeCompetency(studentId, key, grade, currentComments[key] || `Évaluation ${type}`);
-            if (error) { setSaveError("Erreur sauvegarde note : " + error); setSavingId(null); return; }
+            apiGradeCompetency(studentId, key, grade, currentComments[key] || `Évaluation ${type}`).catch(() => {});
           }
         }
         if (type) {
@@ -292,7 +292,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         setDraftLoadedByKind((prev: Record<"PREPARATOIRE" | "CCF", boolean>) => ({ ...prev, [evaluationKind]: true }));
       }
 
-      setDirtyCodes((prev) => { const next = new Set(prev); next.delete(competencyCode); return next; });
+      setDirtyCodes((prev: Set<string>) => { const next = new Set(prev); next.delete(competencyCode); return next; });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
@@ -316,7 +316,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       const nextState = !isValidated;
       const res = await apiValidateEvaluation(studentId, type, nextState, evaluationKind);
       if (res && !res.error) {
-        setValidationByKind((prev) => ({
+        setValidationByKind((prev: Record<EvaluationKind, { isValidated: boolean; validatedAt: string | null }>) => ({
           ...prev,
           [evaluationKind]: {
             isValidated: nextState,
