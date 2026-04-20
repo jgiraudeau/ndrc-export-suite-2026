@@ -181,11 +181,15 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const startRecording = useCallback((key: string) => {
     if (listeningKey === key) {
       recognitionRef.current?.stop();
+      recognitionRef.current = null;
       setListeningKey(null);
       return;
     }
 
-    recognitionRef.current?.abort();
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+      recognitionRef.current = null;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
@@ -213,15 +217,17 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     r.onerror = (e: any) => {
       console.warn("[Speech]", e.error);
       if (e.error === "not-allowed" || e.error === "permission-denied") {
-        setSaveError("Microphone non autorisé. Autorisez l'accès dans les paramètres du navigateur.");
-      } else if (e.error === "no-speech") {
-        setSaveError("Aucune voix détectée. Réessayez.");
-      } else {
-        setSaveError("Reconnaissance vocale impossible : " + e.error);
+        setSaveError("Microphone non autorisé. Autorisez l'accès dans les paramètres du navigateur (icône 🔒 dans la barre d'adresse).");
+        setListeningKey(null);
       }
-      setListeningKey(null);
+      // no-speech = timeout Chrome sans voix détectée → relance automatique
     };
-    r.onend = () => setListeningKey(null);
+    r.onend = () => {
+      // Si le micro est toujours actif (listeningKey encore défini), relancer
+      if (recognitionRef.current === r) {
+        try { r.start(); } catch { setListeningKey(null); }
+      }
+    };
     recognitionRef.current = r;
     r.start();
 
