@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
   if (file.size > 20 * 1024 * 1024) return apiError("Audio trop lourd (max 20 Mo)", 400);
 
   const allowed = ["audio/webm", "audio/mp4", "audio/ogg", "audio/mpeg", "audio/wav"];
-  if (!allowed.includes(file.type)) return apiError("Format audio non supporté", 400);
+  const baseType = file.type.split(";")[0].trim();
+  if (!allowed.includes(baseType)) return apiError("Format audio non supporté", 400);
 
   const ext = file.type.split("/")[1]?.split(";")[0] ?? "webm";
   const name = `audio-comment-${auth.payload.sub}-${Date.now()}.${ext}`;

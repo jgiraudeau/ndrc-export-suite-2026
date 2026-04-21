@@ -74,7 +74,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     CCF: false,
   });
   const formativeLoadedRef = useRef(false);
-  const interimRef = useRef<Record<string, string>>({});
   const [validationByKind, setValidationByKind] = useState<Record<EvaluationKind, { isValidated: boolean; validatedAt: string | null }>>({
     FORMATIVE: { isValidated: false, validatedAt: null },
     PREPARATOIRE: { isValidated: false, validatedAt: null },
@@ -83,9 +82,10 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [loadingKindData, setLoadingKindData] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [listeningKey, setListeningKey] = useState<string | null>(null);
-  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null); // Note: reused for MediaRecorder in some places or kept for legacy cleanup
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const isValidated = validationByKind[evaluationKind].isValidated;
   const validatedAt = validationByKind[evaluationKind].validatedAt;
@@ -200,80 +200,93 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     setCurrentComments((prev: Record<string, string>) => ({ ...prev, [key]: value }));
     const competencyCode = key.replace(/_\d+$/, "");
     setDirtyCodes((prev: Set<string>) => new Set(prev).add(competencyCode));
+    triggerAutoSave(competencyCode);
   };
 
-  const startRecording = useCallback((key: string) => {
+  const startRecording = useCallback(async (key: string) => {
+    // Si on clique sur le bouton alors qu'on enregistre déjà cet élément, on arrête
     if (listeningKey === key) {
-      recognitionRef.current?.stop();
-      recognitionRef.current = null;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
       setListeningKey(null);
       return;
     }
 
-    if (recognitionRef.current) {
-      recognitionRef.current.abort();
-      recognitionRef.current = null;
+    // Arrêter toute session en cours
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      alert("La reconnaissance vocale n'est pas supportée par ce navigateur. Utilisez Chrome ou Edge.");
-      return;
-    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const r = new SR() as any;
-    r.lang = "fr-FR";
-    r.continuous = true;
-    r.interimResults = true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    r.onresult = (e: any) => {
-      let finalText = "";
-      let interimText = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
-        else interimText += e.results[i][0].transcript;
-      }
-      // Interim : stocker dans le ref pour affichage live
-      if (interimText) interimRef.current[key] = interimText;
-      // Final : fusionner avec le commentaire existant (via setState fonctionnel = pas de closure stale)
-      if (finalText) {
-        interimRef.current[key] = "";
-        setCurrentComments((prev: Record<string, string>) => {
-          const base = prev[key] ? prev[key] + " " : "";
-          return { ...prev, [key]: base + finalText.trim() };
-        });
-        const code = key.replace(/_\d+$/, "");
-        setDirtyCodes((prev: Set<string>) => new Set(prev).add(code));
-      }
-      // Forcer un re-render pour afficher l'interim
-      if (interimText) forceUpdate();
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    r.onerror = (e: any) => {
-      console.warn("[Speech]", e.error);
-      if (e.error === "not-allowed" || e.error === "permission-denied") {
-        setSaveError("Microphone non autorisé. Autorisez l'accès dans les paramètres du navigateur (icône 🔒 dans la barre d'adresse).");
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        stream.getTracks().forEach(track => track.stop()); // Libérer le micro
+
+        if (audioBlob.size < 1000) {
+            setListeningKey(null);
+            return; // Trop court
+        }
+
+        setTranscribingKey(key);
         setListeningKey(null);
-      }
-      // no-speech = timeout Chrome sans voix détectée → relance automatique
-    };
-    r.onend = () => {
-      if (recognitionRef.current === r) {
-        // Délai obligatoire : Chrome lance InvalidStateError si on rappelle start() trop tôt
-        setTimeout(() => {
-          if (recognitionRef.current === r) {
-            try { r.start(); } catch { setListeningKey(null); }
-          }
-        }, 300);
-      }
-    };
-    recognitionRef.current = r;
-    r.start();
 
-    setListeningKey(key);
-  }, [listeningKey]);
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "comment.webm");
+
+          const response = await fetch("/api/ai/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (data.text) {
+            const cleanText = data.text.trim();
+            setCurrentComments((prev) => {
+              const current = prev[key] || "";
+              const updated = current + (current ? " " : "") + cleanText;
+              return { ...prev, [key]: updated };
+            });
+            const competencyCode = key.replace(/_\d+$/, "");
+            if (key === "GLOBAL") {
+                setGlobalCommentDirty(true);
+            } else {
+                setDirtyCodes((prev: Set<string>) => new Set(prev).add(competencyCode));
+                triggerAutoSave(competencyCode);
+            }
+          }
+        } catch (err) {
+          console.error("Transcription error", err);
+          setSaveError("Échec de la transcription IA. Vérifiez votre connexion.");
+        } finally {
+          setTranscribingKey(null);
+        }
+      };
+
+      recorder.start();
+      setListeningKey(key);
+      setSaveError(null);
+    } catch (err: any) {
+      console.error("Microphone error", err);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setSaveError("Accès micro refusé. Veuillez autoriser le micro dans votre navigateur.");
+      } else {
+        setSaveError("Impossible d'accéder au microphone.");
+      }
+      setListeningKey(null);
+    }
+  }, [listeningKey, triggerAutoSave]);
 
   const handleSaveGlobalComment = async () => {
     if (!type || isReadOnly) return;
@@ -510,15 +523,17 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                       >
                                         {isListening ? (
                                           <><MicOff size={12} /> Stop</>
+                                        ) : transcribingKey === key ? (
+                                          <><Loader2 size={12} className="animate-spin" /> Transcription IA...</>
                                         ) : (
-                                          <><Mic size={12} /> Dicter</>
+                                          <><Mic size={12} /> Dicter (IA)</>
                                         )}
                                       </button>
                                     )}
                                   </div>
 
                                   <textarea
-                                    value={(currentComments[key] || "") + (interimRef.current[key] ? " " + interimRef.current[key] : "")}
+                                    value={currentComments[key] || ""}
                                     onChange={(e) => handleCommentChange(key, e.target.value)}
                                     disabled={isReadOnly}
                                     placeholder={`Votre retour sur « ${child.description} » — axes d'amélioration, points forts…`}
@@ -560,16 +575,39 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
               <Sparkles size={18} className="text-purple-500" />
               Commentaire général — ensemble du référentiel
             </h3>
-            {globalCommentDirty && (
-              <button
-                onClick={handleSaveGlobalComment}
-                disabled={isSavingGlobal}
-                className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2 rounded-xl font-black text-xs shadow hover:scale-105 transition-all disabled:opacity-50"
-              >
-                {isSavingGlobal ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-                Enregistrer
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => startRecording("GLOBAL")}
+                  title={listeningKey === "GLOBAL" ? "Arrêter la dictée" : "Dicter un commentaire global"}
+                  className={cn(
+                    "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black transition-all",
+                    listeningKey === "GLOBAL"
+                      ? "bg-red-100 text-red-600 animate-pulse"
+                      : "bg-purple-50 text-purple-500 hover:bg-purple-100 border border-purple-100"
+                  )}
+                >
+                  {listeningKey === "GLOBAL" ? (
+                    <><MicOff size={14} /> Stop</>
+                  ) : transcribingKey === "GLOBAL" ? (
+                    <><Loader2 size={14} className="animate-spin" /> Transcription...</>
+                  ) : (
+                    <><Mic size={14} /> Dicter (IA)</>
+                  )}
+                </button>
+              )}
+              {globalCommentDirty && (
+                <button
+                  onClick={handleSaveGlobalComment}
+                  disabled={isSavingGlobal}
+                  className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2 rounded-xl font-black text-xs shadow hover:scale-105 transition-all disabled:opacity-50"
+                >
+                  {isSavingGlobal ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                  Enregistrer
+                </button>
+              )}
+            </div>
           </div>
           <textarea
             value={globalComment}
