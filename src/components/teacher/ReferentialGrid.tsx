@@ -220,7 +220,15 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      
+      // Tenter de trouver un format supporté par le navigateur
+      const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
+      const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
+      
+      const recorder = new MediaRecorder(stream, {
+        mimeType: supportedType
+      });
+      
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -283,16 +291,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         }
       };
 
-      // Tenter de trouver un format supporté par le navigateur
-      const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
-      const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
-      
-      const recorder = new MediaRecorder(stream, {
-        mimeType: supportedType
-      });
-      
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
       recorder.start();
       setListeningKey(key);
       setSaveError(null);
