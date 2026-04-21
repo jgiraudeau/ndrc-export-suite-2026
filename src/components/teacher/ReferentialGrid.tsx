@@ -229,7 +229,8 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const mimeType = recorder.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         stream.getTracks().forEach(track => track.stop()); // Libérer le micro
 
         if (audioBlob.size < 1000) {
@@ -249,6 +250,11 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
             body: formData,
           });
 
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Erreur serveur (${response.status})`);
+          }
+
           const data = await response.json();
 
           if (data.text) {
@@ -265,15 +271,28 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                 setDirtyCodes((prev: Set<string>) => new Set(prev).add(competencyCode));
                 triggerAutoSave(competencyCode);
             }
+          } else {
+            console.warn("Transcription vide reçue de l'IA");
+            setSaveError("L'IA n'a détecté aucune parole. Parlez plus fort ou plus près du micro.");
           }
-        } catch (err) {
-          console.error("Transcription error", err);
-          setSaveError("Échec de la transcription IA. Vérifiez votre connexion.");
+        } catch (err: any) {
+          console.error("Transcription error detail:", err);
+          setSaveError("Détail erreur : " + (err.message || "Échec inconnu"));
         } finally {
           setTranscribingKey(null);
         }
       };
 
+      // Tenter de trouver un format supporté par le navigateur
+      const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
+      const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
+      
+      const recorder = new MediaRecorder(stream, {
+        mimeType: supportedType
+      });
+      
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
       recorder.start();
       setListeningKey(key);
       setSaveError(null);
