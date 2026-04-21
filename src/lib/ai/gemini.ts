@@ -113,3 +113,36 @@ export async function* generateTextStream(
     if (text) yield text;
   }
 }
+
+/**
+ * Transcrit un contenu audio en utilisant Gemini 1.5 Flash.
+ */
+export async function transcribeAudio(
+  base64Audio: string,
+  mimeType: string,
+  options?: GeminiTextOptions
+): Promise<string> {
+  const model = options?.model || "gemini-1.5-flash";
+  const prompt = "Transcription fidèle et naturelle de ce court commentaire audio pédagogique d'un professeur. Renvoie uniquement le texte transcrit, sans ajout d'intro/outro, sans ponctuation excessive. Si c'est inaudible ou vide, renvoie une chaîne vide.";
+
+  const config: GenerateContentConfig = {
+    temperature: 0,
+    maxOutputTokens: 1024,
+  };
+
+  const response = await genAI.models.generateContent({
+    model,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: prompt },
+          { inlineData: { data: base64Audio, mimeType } }
+        ],
+      },
+    ] as any,
+    config,
+  });
+
+  return response.text ?? "";
+}

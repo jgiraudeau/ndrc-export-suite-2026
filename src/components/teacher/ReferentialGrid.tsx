@@ -351,9 +351,20 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   return (
     <div className="space-y-6">
       {saveError && (
-        <div className="flex items-center justify-between gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-3 text-sm font-bold">
-          <span>⚠ {saveError}</span>
-          <button onClick={() => setSaveError(null)} className="text-red-400 hover:text-red-600 font-black text-lg leading-none">×</button>
+        <div className="flex flex-col gap-2 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm shadow-lg animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center justify-between">
+            <span className="font-black flex items-center gap-2">
+              <AlertCircle size={20} />
+              Erreur de Transcription IA
+            </span>
+            <button onClick={() => setSaveError(null)} className="text-red-400 hover:text-red-600 font-black text-xl leading-none">×</button>
+          </div>
+          <p className="font-bold opacity-90 pl-7">
+            {saveError}
+          </p>
+          <p className="text-[10px] uppercase tracking-widest pl-7 mt-1 opacity-50 font-black">
+            Veuillez signaler ce message précis pour que je puisse corriger.
+          </p>
         </div>
       )}
       {saveSuccess && (
