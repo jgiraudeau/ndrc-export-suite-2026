@@ -218,7 +218,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
-
+    try {
       setDebugStep("1. Demande micro...");
       const stream = await Promise.race([
         navigator.mediaDevices.getUserMedia({ audio: true }),
