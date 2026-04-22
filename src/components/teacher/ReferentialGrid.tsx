@@ -223,7 +223,13 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     try {
       setDebugStep("1. Demande micro...");
       const stream = await Promise.race([
-        navigator.mediaDevices.getUserMedia({ audio: true }),
+        navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true
+          } 
+        }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout micro (3s)")), 3000))
       ]);
       
@@ -234,11 +240,11 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       
       if (!supportedType) throw new Error("Aucun format audio supporté");
 
-      // V21: Amplification audio (Booster de signal)
+      // V22: Ajustement Gain (1.5x) pour éviter la saturation
       const audioContext = new AudioContext();
       const source = audioContext.createMediaStreamSource(stream);
       const gainNode = audioContext.createGain();
-      gainNode.gain.value = 2.5; // Booster le volume de 250%
+      gainNode.gain.value = 1.5; 
       
       const destination = audioContext.createMediaStreamDestination();
       source.connect(gainNode);

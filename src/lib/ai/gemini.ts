@@ -140,8 +140,7 @@ RÈGLES STRICTES :
     const data = await response.json();
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
     
-    if (resultText === "[VIDE]") return "";
-    
+    // V22: On retourne tout ce que l'IA a trouvé pour le diagnostic
     return resultText;
   } catch (error: any) {
     console.error("[Transcribe Audio Error]", error.message);
