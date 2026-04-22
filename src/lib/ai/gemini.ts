@@ -125,15 +125,12 @@ export async function transcribeAudio(
   const primaryModel = "gemini-1.5-flash-latest";
   const fallbackModel = "gemini-2.5-flash-lite";
   
-  const prompt = "TRANSCRIPTION LITTÉRALE : Transcris mot à mot le contenu de cet audio. \n" +
-                 "IMPORTANT : Produis uniquement le texte parlé. \n" +
-                 "INTERDICTION STRICTE : Ne génère AUCUN timestamp (ex: 00:01, 00:02), aucune métadonnée, aucun découpage temporel. \n" +
-                 "Si tu n'entends rien de compréhensible, renvoie exactement [VIDE].";
+  const prompt = "Transcris ce commentaire audio. Écris exactement ce que tu entends, même si le son est faible. Ne génère pas de timestamps (00:00, etc.).";
 
   const cleanMimeType = mimeType.split(";")[0]; // Retirer les codecs (ex: audio/webm;codecs=opus -> audio/webm)
   
   const config: GenerateContentConfig = {
-    temperature: 0.1,
+    temperature: 0.4,
     maxOutputTokens: 1024,
   };
 
