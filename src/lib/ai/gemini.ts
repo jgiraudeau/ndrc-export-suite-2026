@@ -130,43 +130,47 @@ export async function transcribeAudio(
                  "INTERDICTION STRICTE : Ne génère AUCUN timestamp (ex: 00:01, 00:02), aucune métadonnée, aucun découpage temporel. \n" +
                  "Si tu n'entends rien de compréhensible, renvoie exactement [VIDE].";
 
+  const cleanMimeType = mimeType.split(";")[0]; // Retirer les codecs (ex: audio/webm;codecs=opus -> audio/webm)
+  
   const config: GenerateContentConfig = {
     temperature: 0.1,
     maxOutputTokens: 1024,
   };
 
-  try {
-    const response = await genAI.models.generateContent({
-      model: primaryModel,
+  const callModel = async (modelName: string) => {
+    return await genAI.models.generateContent({
+      model: modelName,
       contents: [
         {
           role: "user",
           parts: [
             { text: prompt },
-            { inlineData: { data: base64Audio, mimeType } }
+            { inlineData: { data: base64Audio, mimeType: cleanMimeType } }
           ],
         },
       ] as any,
       config,
     });
+  };
+
+  const watchdog = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timeout IA (${timeoutMs/1000}s)`)), timeoutMs))
+    ]);
+  };
+
+  try {
+    const response = await watchdog(callModel(primaryModel), 9000);
     return response.text?.trim() ?? "";
   } catch (error: any) {
-    console.warn(`[Gemini] Primary model ${primaryModel} failed, trying fallback ${fallbackModel}`, error.message);
+    console.warn(`[Gemini] Primary model ${primaryModel} failed or timed out: ${error.message}`);
     
-    // Fallback sur le modèle du projet si le premier échoue (ex: 404)
-    const response = await genAI.models.generateContent({
-      model: fallbackModel,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: prompt },
-            { inlineData: { data: base64Audio, mimeType } }
-          ],
-        },
-      ] as any,
-      config,
-    });
-    return response.text?.trim() ?? "";
+    try {
+      const response = await watchdog(callModel(fallbackModel), 9000);
+      return response.text?.trim() ?? "";
+    } catch (fallbackError: any) {
+      throw new Error(`Échec total transcription (Original: ${error.message}, Fallback: ${fallbackError.message})`);
+    }
   }
 }
