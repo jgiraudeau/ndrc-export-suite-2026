@@ -1,4 +1,5 @@
-import { GoogleGenAI, type Content, type GenerateContentConfig } from "@google/genai";
+import { GoogleGenAI, type GenerateContentConfig } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
@@ -6,10 +7,13 @@ if (!GEMINI_API_KEY) {
   throw new Error("Missing GEMINI_API_KEY / GOOGLE_API_KEY environment variable");
 }
 
-// On utilise le SDK @google/genai qui supporte le File Search (RAG)
+// Client 1 : Version "Entreprise/Vertex" (Nécessaire pour le File Search / RAG actuel)
 export const genAI = new GoogleGenAI({ 
   apiKey: GEMINI_API_KEY,
 });
+
+// Client 2 : Version "Standard/AI Studio" (Nécessaire pour la transcription audio avec cette clé)
+const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 type GeminiTextOptions = {
   model?: string;
@@ -21,7 +25,7 @@ type GeminiTextOptions = {
 };
 
 /**
- * Génère du contenu avec Gemini Pro en mode texte.
+ * Génère du contenu avec Gemini Pro (via le moteur Entreprise pour le RAG).
  */
 export async function generateText(
   systemInstruction: string,
@@ -56,8 +60,7 @@ export async function generateText(
 }
 
 /**
- * Génère du contenu en streaming avec Gemini.
- * Utilisé pour le chatbot tuteur.
+ * Génère du contenu en streaming (via le moteur Entreprise pour le Chatbot).
  */
 export async function* generateTextStream(
   systemInstruction: string,
@@ -95,41 +98,29 @@ export async function* generateTextStream(
 }
 
 /**
- * Transcrit un contenu audio en utilisant Gemini 1.5 Flash.
+ * Transcrit un contenu audio (via le moteur AI Studio Standard).
+ * C'est cette version qui évite les erreurs 404 sur votre clé.
  */
 export async function transcribeAudio(
   base64Audio: string,
   mimeType: string,
   options?: GeminiTextOptions
 ): Promise<string> {
-  // Utilisation d'un nom de modèle ultra-standard pour éviter les 404 du SDK GenAI
-  const model = "gemini-1.5-flash";
-  const cleanMimeType = mimeType.split(";")[0];
+  const modelName = options?.model || "gemini-1.5-flash";
+  const model = aiStudio.getGenerativeModel({ model: modelName });
   
+  const cleanMimeType = mimeType.split(";")[0];
   const prompt = "Transcris exactement cet audio en français. Ne génère aucune autre phrase, aucun commentaire, aucun timestamp.";
 
-  const config: GenerateContentConfig = {
-    temperature: 0,
-    maxOutputTokens: 1024,
-  };
-
   try {
-    const response = await genAI.models.generateContent({
-      model,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { data: base64Audio, mimeType: cleanMimeType } },
-            { text: prompt }
-          ],
-        },
-      ] as any,
-      config,
-    });
-    return response.text?.trim() ?? "";
+    const result = await model.generateContent([
+      { inlineData: { data: base64Audio, mimeType: cleanMimeType } },
+      { text: prompt }
+    ]);
+    const response = await result.response;
+    return response.text()?.trim() || "";
   } catch (error: any) {
-    console.error("[Gemini Transcribe Error]", error.message);
-    throw new Error(`Transcription impossible : ${error.message}`);
+    console.error("[AI Studio Transcribe Error]", error.message);
+    throw new Error(`Erreur transcription : ${error.message}`);
   }
 }
