@@ -28,7 +28,7 @@ export async function generateText(
   userMessage: string,
   options?: GeminiTextOptions
 ): Promise<string> {
-  const model = options?.model || "gemini-2.0-flash-lite"; // Version Lite pour économiser le quota
+  const model = options?.model || "gemini-2.5-flash-lite"; // Version 2.5 par défaut
   const config: GenerateContentConfig = {
     systemInstruction,
     temperature: options?.temperature ?? 0.7,
@@ -61,7 +61,7 @@ export async function* generateTextStream(
   messages: any[],
   options?: GeminiTextOptions
 ): AsyncIterable<string> {
-  const model = options?.model || "gemini-2.0-flash-lite"; // Version Lite pour économiser le quota
+  const model = options?.model || "gemini-2.5-flash-lite"; // Version 2.5 par défaut
   const config: GenerateContentConfig = {
     systemInstruction,
     temperature: options?.temperature ?? 0.7,
@@ -91,7 +91,7 @@ export async function* generateTextStream(
 
 /**
  * Transcrit un contenu audio.
- * Utilise Gemini 2.0 Flash Lite (Quota plus généreux).
+ * Utilise Gemini 2.5 Flash Lite (Le tout dernier modèle de votre liste).
  */
 export async function transcribeAudio(
   base64Audio: string,
@@ -99,8 +99,8 @@ export async function transcribeAudio(
 ): Promise<string> {
   const cleanMimeType = mimeType.split(";")[0];
   
-  // Modèle LITE : Consomme moins de quota
-  const modelName = "gemini-2.0-flash-lite"; 
+  // Modèle 2.5 LITE : Le plus récent et économe en quota sur votre compte
+  const modelName = "gemini-2.5-flash-lite"; 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
 
   const payload = {
@@ -125,11 +125,10 @@ export async function transcribeAudio(
 
     if (!response.ok) {
       const errorJson = await response.json().catch(() => ({}));
-      // Message plus clair pour l'utilisateur en cas de quota épuisé
       if (response.status === 429) {
-        throw new Error("Quota Google atteint (trop d'essais). Attendez 1 minute puis réessayez.");
+        throw new Error("Quota Google atteint. Veuillez patienter 1 minute.");
       }
-      throw new Error(`Erreur API Google: ${JSON.stringify(errorJson)}`);
+      throw new Error(`Erreur API Google (Modèle 2.5): ${JSON.stringify(errorJson)}`);
     }
 
     const data = await response.json();
