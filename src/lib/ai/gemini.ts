@@ -122,27 +122,51 @@ export async function transcribeAudio(
   mimeType: string,
   options?: GeminiTextOptions
 ): Promise<string> {
-  const model = options?.model || "gemini-2.5-flash-lite";
-  const prompt = "TRANSCRIPTION LITTÉRALE : Transcris mot à mot le contenu de cet audio. Ne reformule pas, n'ajoute rien, ne retire rien. Si le son est de mauvaise qualité, fais au mieux mais ne devine pas de phrases sans rapport. Renvoie uniquement le texte brut.";
+  const primaryModel = "gemini-1.5-flash-latest";
+  const fallbackModel = "gemini-2.5-flash-lite";
+  
+  const prompt = "TRANSCRIPTION LITTÉRALE : Transcris mot à mot le contenu de cet audio. \n" +
+                 "IMPORTANT : Produis uniquement le texte parlé. \n" +
+                 "INTERDICTION STRICTE : Ne génère AUCUN timestamp (ex: 00:01, 00:02), aucune métadonnée, aucun découpage temporel. \n" +
+                 "Si tu n'entends rien de compréhensible, renvoie exactement [VIDE].";
 
   const config: GenerateContentConfig = {
-    temperature: 0,
+    temperature: 0.1,
     maxOutputTokens: 1024,
   };
 
-  const response = await genAI.models.generateContent({
-    model,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          { inlineData: { data: base64Audio, mimeType } }
-        ],
-      },
-    ] as any,
-    config,
-  });
-
-  return response.text ?? "";
+  try {
+    const response = await genAI.models.generateContent({
+      model: primaryModel,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { data: base64Audio, mimeType } }
+          ],
+        },
+      ] as any,
+      config,
+    });
+    return response.text?.trim() ?? "";
+  } catch (error: any) {
+    console.warn(`[Gemini] Primary model ${primaryModel} failed, trying fallback ${fallbackModel}`, error.message);
+    
+    // Fallback sur le modèle du projet si le premier échoue (ex: 404)
+    const response = await genAI.models.generateContent({
+      model: fallbackModel,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { data: base64Audio, mimeType } }
+          ],
+        },
+      ] as any,
+      config,
+    });
+    return response.text?.trim() ?? "";
+  }
 }

@@ -265,9 +265,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           }
 
           const data = await response.json();
+          const cleanText = data.text ? data.text.trim() : "";
 
-          if (data.text) {
-            const cleanText = data.text.trim();
+          if (cleanText && cleanText !== "[VIDE]") {
             setCurrentComments((prev) => {
               const current = prev[key] || "";
               const updated = current + (current ? " " : "") + cleanText;
