@@ -281,8 +281,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                 triggerAutoSave(competencyCode);
             }
           } else {
-            console.warn("Transcription vide reçue de l'IA");
-            setSaveError("L'IA n'a détecté aucune parole. Parlez plus fort ou plus près du micro.");
+            setSaveError("Aucune parole claire détectée par l'IA. Parlez plus fort ou vérifiez votre micro.");
           }
         } catch (err: any) {
           console.error("Transcription error detail:", err);
