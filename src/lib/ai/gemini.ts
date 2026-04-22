@@ -6,7 +6,7 @@ if (!GEMINI_API_KEY) {
   throw new Error("Missing GEMINI_API_KEY / GOOGLE_API_KEY environment variable");
 }
 
-// Client RAG/Chat (Moteur Entreprise) - On garde ce qui marche pour le chatbot
+// Client RAG/Chat (Moteur Entreprise)
 export const genAI = new GoogleGenAI({ 
   apiKey: GEMINI_API_KEY,
 });
@@ -90,17 +90,37 @@ export async function* generateTextStream(
 }
 
 /**
- * Transcrit un contenu audio via l'API REST directe de Google.
- * Évite tous les problèmes de version/compatibilité des SDK.
+ * Découvre les modèles disponibles pour cette clé.
+ */
+async function getAvailableModels(): Promise<string[]> {
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return data.models?.map((m: any) => m.name.replace("models/", "")) || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Transcrit un contenu audio avec auto-découverte du modèle compatible.
  */
 export async function transcribeAudio(
   base64Audio: string,
   mimeType: string,
 ): Promise<string> {
-  // On utilise le nom COMPLET du modèle
-  const modelName = "gemini-1.5-flash-latest";
   const cleanMimeType = mimeType.split(";")[0];
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+  
+  // 1. Découvrir quel modèle utiliser
+  const available = await getAvailableModels();
+  
+  // On cherche par ordre de préférence
+  const candidates = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-pro-vision", "gemini-pro"];
+  const modelToUse = candidates.find(c => available.includes(c)) || "gemini-1.5-flash";
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${GEMINI_API_KEY}`;
 
   const payload = {
     contents: [{
@@ -108,11 +128,7 @@ export async function transcribeAudio(
         { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
         { text: "Transcris exactement cet audio en français. Ne génère que le texte." }
       ]
-    }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 1024
-    }
+    }]
   };
 
   try {
@@ -123,23 +139,12 @@ export async function transcribeAudio(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      let errorJson;
-      try { errorJson = JSON.parse(errorText); } catch { errorJson = errorText; }
-      
-      console.error("[REST API Error]", response.status, errorJson);
-      throw new Error(`Google API (HTTP ${response.status}): ${JSON.stringify(errorJson)}`);
+      const errorJson = await response.json().catch(() => ({}));
+      throw new Error(`Modèle utilisé: ${modelToUse}. Erreur Google: ${JSON.stringify(errorJson)}. Modèles dispos: ${available.join(', ')}`);
     }
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!text) {
-      console.warn("[REST API Warning] Pas de texte dans la réponse", JSON.stringify(data));
-      return "";
-    }
-
-    return text.trim();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
   } catch (error: any) {
     console.error("[Transcribe Audio Error]", error.message);
     throw error;
