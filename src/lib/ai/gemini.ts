@@ -21,14 +21,14 @@ type GeminiTextOptions = {
 };
 
 /**
- * Génère du contenu avec Gemini (via le moteur Entreprise pour le RAG).
+ * Génère du contenu avec Gemini.
  */
 export async function generateText(
   systemInstruction: string,
   userMessage: string,
   options?: GeminiTextOptions
 ): Promise<string> {
-  const model = options?.model || "gemini-2.5-flash-lite"; // Version 2.5 par défaut
+  const model = options?.model || "gemini-2.5-flash-lite";
   const config: GenerateContentConfig = {
     systemInstruction,
     temperature: options?.temperature ?? 0.7,
@@ -54,14 +54,14 @@ export async function generateText(
 }
 
 /**
- * Génère du contenu en streaming (via le moteur Entreprise).
+ * Génère du contenu en streaming.
  */
 export async function* generateTextStream(
   systemInstruction: string,
   messages: any[],
   options?: GeminiTextOptions
 ): AsyncIterable<string> {
-  const model = options?.model || "gemini-2.5-flash-lite"; // Version 2.5 par défaut
+  const model = options?.model || "gemini-2.5-flash-lite";
   const config: GenerateContentConfig = {
     systemInstruction,
     temperature: options?.temperature ?? 0.7,
@@ -91,28 +91,37 @@ export async function* generateTextStream(
 
 /**
  * Transcrit un contenu audio.
- * Utilise Gemini 2.5 Flash Lite (Le tout dernier modèle de votre liste).
+ * Correction V19 : Prompt strict anti-hallucination.
  */
 export async function transcribeAudio(
   base64Audio: string,
   mimeType: string,
 ): Promise<string> {
   const cleanMimeType = mimeType.split(";")[0];
-  
-  // Modèle 2.5 LITE : Le plus récent et économe en quota sur votre compte
   const modelName = "gemini-2.5-flash-lite"; 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+
+  // PROMPT ANTI-HALLUCINATION EXTRÊME
+  const prompt = `TU ES UN SYSTÈME DE TRANSCRIPTION LITTÉRALE AUTOMATIQUE.
+RÈGLES STRICTES :
+1. ÉCOUTE l'audio et écrit UNIQUEMENT les mots prononcés en français.
+2. NE DIS PAS "Bonjour", "Je suis Jean-Luc", ou tout autre message d'accueil.
+3. SI l'audio est silencieux ou incompréhensible, répond exactement ceci : [VIDE]
+4. NE RÉPONDS PAS à l'utilisateur, TRANSCRIS ses paroles.
+5. TA RÉPONSE DOIT CONTENIR UNIQUEMENT LA TRANSCRIPTION.`;
 
   const payload = {
     contents: [{
       parts: [
         { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
-        { text: "Transcris exactement cet audio en français. Ne génère que le texte." }
+        { text: prompt }
       ]
     }],
     generationConfig: {
-      temperature: 0,
-      maxOutputTokens: 1024
+      temperature: 0, // Zéro créativité
+      maxOutputTokens: 1024,
+      topP: 0.1,
+      topK: 1
     }
   };
 
@@ -125,14 +134,16 @@ export async function transcribeAudio(
 
     if (!response.ok) {
       const errorJson = await response.json().catch(() => ({}));
-      if (response.status === 429) {
-        throw new Error("Quota Google atteint. Veuillez patienter 1 minute.");
-      }
-      throw new Error(`Erreur API Google (Modèle 2.5): ${JSON.stringify(errorJson)}`);
+      throw new Error(`Erreur API Google: ${JSON.stringify(errorJson)}`);
     }
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    
+    // Nettoyage final
+    if (resultText === "[VIDE]") return "";
+    
+    return resultText;
   } catch (error: any) {
     console.error("[Transcribe Audio Error]", error.message);
     throw error;
