@@ -91,7 +91,7 @@ export async function* generateTextStream(
 
 /**
  * Transcrit un contenu audio.
- * Correction V19 : Prompt strict anti-hallucination.
+ * V20 : Utilisation de system_instruction pour éviter les répétitions.
  */
 export async function transcribeAudio(
   base64Audio: string,
@@ -101,24 +101,24 @@ export async function transcribeAudio(
   const modelName = "gemini-2.5-flash-lite"; 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
 
-  // PROMPT ANTI-HALLUCINATION EXTRÊME
-  const prompt = `TU ES UN SYSTÈME DE TRANSCRIPTION LITTÉRALE AUTOMATIQUE.
+  const systemInstruction = `TU ES UN SYSTÈME DE TRANSCRIPTION LITTÉRALE AUTOMATIQUE.
 RÈGLES STRICTES :
-1. ÉCOUTE l'audio et écrit UNIQUEMENT les mots prononcés en français.
-2. NE DIS PAS "Bonjour", "Je suis Jean-Luc", ou tout autre message d'accueil.
-3. SI l'audio est silencieux ou incompréhensible, répond exactement ceci : [VIDE]
-4. NE RÉPONDS PAS à l'utilisateur, TRANSCRIS ses paroles.
-5. TA RÉPONSE DOIT CONTENIR UNIQUEMENT LA TRANSCRIPTION.`;
+1. TRANSCRIS UNIQUEMENT les mots prononcés dans l'audio.
+2. NE RÉPÈTE JAMAIS mes consignes.
+3. NE DIS PAS "Bonjour" ou quoi que ce soit d'autre.
+4. Si silencieux, répond [VIDE].`;
 
   const payload = {
+    system_instruction: {
+      parts: [{ text: systemInstruction }]
+    },
     contents: [{
       parts: [
-        { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
-        { text: prompt }
+        { inlineData: { mimeType: cleanMimeType, data: base64Audio } }
       ]
     }],
     generationConfig: {
-      temperature: 0, // Zéro créativité
+      temperature: 0,
       maxOutputTokens: 1024,
       topP: 0.1,
       topK: 1
@@ -140,7 +140,6 @@ RÈGLES STRICTES :
     const data = await response.json();
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
     
-    // Nettoyage final
     if (resultText === "[VIDE]") return "";
     
     return resultText;
