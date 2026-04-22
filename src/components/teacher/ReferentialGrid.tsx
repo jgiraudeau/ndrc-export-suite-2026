@@ -83,6 +83,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [isValidating, setIsValidating] = useState(false);
   const [listeningKey, setListeningKey] = useState<string | null>(null);
   const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
+  const [debugStep, setDebugStep] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null); // Note: reused for MediaRecorder in some places or kept for legacy cleanup
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -218,16 +219,22 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       mediaRecorderRef.current.stop();
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setDebugStep("1. Demande micro...");
+      const stream = await Promise.race([
+        navigator.mediaDevices.getUserMedia({ audio: true }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout micro (3s)")), 3000))
+      ]);
       
+      setDebugStep("2. Config recorder...");
       // Tenter de trouver un format supporté par le navigateur
       const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
       const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
       
+      if (!supportedType) throw new Error("Aucun format audio supporté");
+
       const recorder = new MediaRecorder(stream, {
         mimeType: supportedType,
-        audioBitsPerSecond: 128000 // Haute qualité pour une meilleure transcription
+        audioBitsPerSecond: 128000
       });
       
       mediaRecorderRef.current = recorder;
@@ -247,6 +254,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
             return; 
         }
 
+        setDebugStep("3. Arrêt & Traitement...");
         setTranscribingKey(key);
         setListeningKey(null);
 
@@ -254,6 +262,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           const formData = new FormData();
           formData.append("audio", audioBlob, "comment.webm");
 
+          setDebugStep("4. Envoi IA...");
           const response = await fetch("/api/ai/transcribe", {
             method: "POST",
             body: formData,
@@ -288,11 +297,13 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           setSaveError("Détail erreur : " + (err.message || "Échec inconnu"));
         } finally {
           setTranscribingKey(null);
+          setDebugStep(null);
         }
       };
 
       recorder.start();
       setListeningKey(key);
+      setDebugStep("🔴 Enregistre...");
       setSaveError(null);
     } catch (err: any) {
       console.error("Microphone error", err);
@@ -550,12 +561,12 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                         )}
                                       >
                                         {isListening ? (
-                                          <><MicOff size={12} /> Stop</>
-                                        ) : transcribingKey === key ? (
-                                          <><Loader2 size={12} className="animate-spin" /> Transcription IA...</>
-                                        ) : (
-                                          <><Mic size={12} /> Dicter (IA)</>
-                                        )}
+                                           <><MicOff size={12} /> {debugStep || "Stop"}</>
+                                         ) : transcribingKey === key ? (
+                                           <><Loader2 size={12} className="animate-spin" /> {debugStep || "Transcription..."}</>
+                                         ) : (
+                                           <><Mic size={12} /> Dicter (IA)</>
+                                         )}
                                       </button>
                                     )}
                                   </div>
