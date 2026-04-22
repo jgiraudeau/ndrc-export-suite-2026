@@ -21,14 +21,14 @@ type GeminiTextOptions = {
 };
 
 /**
- * Génère du contenu avec Gemini Pro (via le moteur Entreprise pour le RAG).
+ * Génère du contenu avec Gemini (via le moteur Entreprise pour le RAG).
  */
 export async function generateText(
   systemInstruction: string,
   userMessage: string,
   options?: GeminiTextOptions
 ): Promise<string> {
-  const model = options?.model || "gemini-1.5-flash";
+  const model = options?.model || "gemini-2.0-flash"; // Mise à jour vers 2.0 par défaut
   const config: GenerateContentConfig = {
     systemInstruction,
     temperature: options?.temperature ?? 0.7,
@@ -54,14 +54,14 @@ export async function generateText(
 }
 
 /**
- * Génère du contenu en streaming (via le moteur Entreprise pour le Chatbot).
+ * Génère du contenu en streaming (via le moteur Entreprise).
  */
 export async function* generateTextStream(
   systemInstruction: string,
   messages: any[],
   options?: GeminiTextOptions
 ): AsyncIterable<string> {
-  const model = options?.model || "gemini-1.5-flash";
+  const model = options?.model || "gemini-2.0-flash"; // Mise à jour vers 2.0 par défaut
   const config: GenerateContentConfig = {
     systemInstruction,
     temperature: options?.temperature ?? 0.7,
@@ -90,22 +90,8 @@ export async function* generateTextStream(
 }
 
 /**
- * Découvre les modèles disponibles pour cette clé.
- */
-async function getAvailableModels(): Promise<string[]> {
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
-    const resp = await fetch(url);
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    return data.models?.map((m: any) => m.name.replace("models/", "")) || [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Transcrit un contenu audio avec auto-découverte du modèle compatible.
+ * Transcrit un contenu audio.
+ * Utilise Gemini 2.0 Flash (confirmé disponible sur votre clé).
  */
 export async function transcribeAudio(
   base64Audio: string,
@@ -113,14 +99,9 @@ export async function transcribeAudio(
 ): Promise<string> {
   const cleanMimeType = mimeType.split(";")[0];
   
-  // 1. Découvrir quel modèle utiliser
-  const available = await getAvailableModels();
-  
-  // On cherche par ordre de préférence
-  const candidates = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-pro-vision", "gemini-pro"];
-  const modelToUse = candidates.find(c => available.includes(c)) || "gemini-1.5-flash";
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${GEMINI_API_KEY}`;
+  // Utilisation de Gemini 2.0 Flash qui est incroyablement rapide pour la voix
+  const modelName = "gemini-2.0-flash"; 
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
 
   const payload = {
     contents: [{
@@ -128,7 +109,11 @@ export async function transcribeAudio(
         { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
         { text: "Transcris exactement cet audio en français. Ne génère que le texte." }
       ]
-    }]
+    }],
+    generationConfig: {
+      temperature: 0,
+      maxOutputTokens: 1024
+    }
   };
 
   try {
@@ -140,7 +125,7 @@ export async function transcribeAudio(
 
     if (!response.ok) {
       const errorJson = await response.json().catch(() => ({}));
-      throw new Error(`Modèle utilisé: ${modelToUse}. Erreur Google: ${JSON.stringify(errorJson)}. Modèles dispos: ${available.join(', ')}`);
+      throw new Error(`Erreur API Google: ${JSON.stringify(errorJson)}`);
     }
 
     const data = await response.json();
