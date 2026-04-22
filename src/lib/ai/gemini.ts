@@ -122,10 +122,10 @@ export async function transcribeAudio(
   mimeType: string,
   options?: GeminiTextOptions
 ): Promise<string> {
-  const primaryModel = "gemini-1.5-pro-latest";
+  const primaryModel = "gemini-1.5-flash-001";
   const fallbackModel = "gemini-1.5-flash-latest";
   
-  const prompt = "TASK: Speech-to-text. LANGUAGE: French. OUTPUT: Transcribed text only. No stamps. No filler.";
+  const prompt = "Transcris cet audio en texte français. Ne dis rien d'autre. Pas de conversation.";
 
   const cleanMimeType = mimeType.split(";")[0];
   

@@ -84,6 +84,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [listeningKey, setListeningKey] = useState<string | null>(null);
   const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
   const [debugStep, setDebugStep] = useState<string | null>(null);
+  const [rawDebug, setRawDebug] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null); // Note: reused for MediaRecorder in some places or kept for legacy cleanup
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -286,6 +287,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
           const data = await response.json();
           const cleanText = data.text ? data.text.trim() : "";
+          setRawDebug(cleanText || JSON.stringify(data));
 
           if (cleanText && cleanText !== "[VIDE]") {
             setCurrentComments((prev) => {
@@ -305,6 +307,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           }
         } catch (err: any) {
           console.error("Transcription error detail:", err);
+          setRawDebug("ERROR: " + err.message);
           setSaveError("Détail erreur : " + (err.message || "Échec inconnu"));
         } finally {
           setTranscribingKey(null);
