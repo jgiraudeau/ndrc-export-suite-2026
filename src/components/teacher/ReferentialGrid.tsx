@@ -303,7 +303,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                 triggerAutoSave(competencyCode);
             }
           } else {
-            setSaveError("Aucune parole claire détectée par l'IA. Parlez plus fort ou vérifiez votre micro.");
+            const msg = "Aucune parole claire détectée par l'IA. Parlez plus fort ou vérifiez votre micro.";
+            setSaveError(msg);
+            setTimeout(() => setSaveError(current => current === msg ? null : current), 8000);
           }
         } catch (err: any) {
           console.error("Transcription error detail:", err);
@@ -376,28 +378,27 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
   return (
     <div className="space-y-6">
-      {saveError && (
-        <div className="flex flex-col gap-2 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm shadow-lg animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center justify-between">
-            <span className="font-black flex items-center gap-2">
-              <AlertCircle size={20} />
-              Erreur de Transcription IA
-            </span>
-            <button onClick={() => setSaveError(null)} className="text-red-400 hover:text-red-600 font-black text-xl leading-none">×</button>
+      <div className="sticky top-4 z-[100] space-y-2 pointer-events-none">
+        {saveError && (
+          <div className="pointer-events-auto flex flex-col gap-2 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm shadow-2xl animate-in fade-in slide-in-from-top-8 max-w-2xl mx-auto">
+            <div className="flex items-center justify-between">
+              <span className="font-black flex items-center gap-2">
+                <AlertCircle size={20} />
+                Erreur de Transcription IA
+              </span>
+              <button onClick={() => setSaveError(null)} className="text-red-400 hover:text-red-600 font-black text-xl leading-none">×</button>
+            </div>
+            <p className="font-bold opacity-90 pl-7">
+              {saveError}
+            </p>
           </div>
-          <p className="font-bold opacity-90 pl-7">
-            {saveError}
-          </p>
-          <p className="text-[10px] uppercase tracking-widest pl-7 mt-1 opacity-50 font-black">
-            Veuillez signaler ce message précis pour que je puisse corriger.
-          </p>
-        </div>
-      )}
-      {saveSuccess && (
-        <div className="bg-green-50 border border-green-200 text-green-700 rounded-2xl px-5 py-3 text-sm font-bold">
-          ✓ Sauvegardé — visible par l&apos;étudiant
-        </div>
-      )}
+        )}
+        {saveSuccess && (
+          <div className="pointer-events-auto bg-green-50 border border-green-200 text-green-700 rounded-2xl px-5 py-3 text-sm font-bold shadow-lg max-w-xl mx-auto animate-in fade-in slide-in-from-top-4">
+            ✓ Sauvegardé — visible par l&apos;étudiant
+          </div>
+        )}
+      </div>
       {title && (
         <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">{title}</h2>
@@ -585,6 +586,12 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                       </button>
                                     )}
                                   </div>
+
+                                  {rawDebug && (transcribingKey === key || isListening) && (
+                                     <div className="text-[10px] text-blue-500 bg-blue-50 p-2 rounded-xl border border-blue-100 italic animate-pulse">
+                                       Signal IA : {rawDebug}
+                                     </div>
+                                   )}
 
                                   <textarea
                                     value={currentComments[key] || ""}
