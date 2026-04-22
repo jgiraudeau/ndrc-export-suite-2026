@@ -122,15 +122,15 @@ export async function transcribeAudio(
   mimeType: string,
   options?: GeminiTextOptions
 ): Promise<string> {
-  const primaryModel = "gemini-1.5-flash-latest";
-  const fallbackModel = "gemini-2.5-flash-lite";
+  const primaryModel = "gemini-1.5-pro-latest";
+  const fallbackModel = "gemini-1.5-flash-latest";
   
-  const prompt = "Transcris ce commentaire audio. Écris exactement ce que tu entends, même si le son est faible. Ne génère pas de timestamps (00:00, etc.).";
+  const prompt = "TASK: Speech-to-text. LANGUAGE: French. OUTPUT: Transcribed text only. No stamps. No filler.";
 
-  const cleanMimeType = mimeType.split(";")[0]; // Retirer les codecs (ex: audio/webm;codecs=opus -> audio/webm)
+  const cleanMimeType = mimeType.split(";")[0];
   
   const config: GenerateContentConfig = {
-    temperature: 0.4,
+    temperature: 0,
     maxOutputTokens: 1024,
   };
 
@@ -141,8 +141,8 @@ export async function transcribeAudio(
         {
           role: "user",
           parts: [
-            { text: prompt },
-            { inlineData: { data: base64Audio, mimeType: cleanMimeType } }
+            { inlineData: { data: base64Audio, mimeType: cleanMimeType } },
+            { text: prompt }
           ],
         },
       ] as any,

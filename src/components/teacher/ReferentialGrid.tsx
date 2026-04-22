@@ -87,6 +87,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const recognitionRef = useRef<any>(null); // Note: reused for MediaRecorder in some places or kept for legacy cleanup
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordStartTimeRef = useRef<number>(0);
 
   const isValidated = validationByKind[evaluationKind].isValidated;
   const validatedAt = validationByKind[evaluationKind].validatedAt;
@@ -247,11 +248,14 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       recorder.onstop = async () => {
         const mimeType = recorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const duration = (Date.now() - recordStartTimeRef.current) / 1000;
         stream.getTracks().forEach(track => track.stop()); // Libérer le micro
 
-        if (audioBlob.size < 2000) { // Un peu plus de marge pour éviter les bruits parasites
+        if (duration < 1) { // Moins d'une seconde = erreur de manip
+            setDebugStep("Trop court...");
+            setTimeout(() => setDebugStep(null), 2000);
             setListeningKey(null);
-            return; 
+            return;
         }
 
         setDebugStep("3. Arrêt & Traitement...");
@@ -263,7 +267,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           formData.append("audio", audioBlob, "comment.webm");
 
           const sizeKB = Math.round(audioBlob.size / 1024);
-          setDebugStep(`4. Envoi IA (${sizeKB}KB)...`);
+          setDebugStep(`4. Analyse IA Pro (${sizeKB}KB)...`);
           
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s max
@@ -309,6 +313,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       };
 
       recorder.start();
+      recordStartTimeRef.current = Date.now();
       setListeningKey(key);
       setDebugStep("🔴 Enregistre...");
       setSaveError(null);
