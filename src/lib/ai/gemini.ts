@@ -1,5 +1,4 @@
 import { GoogleGenAI, type GenerateContentConfig } from "@google/genai";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
@@ -7,13 +6,10 @@ if (!GEMINI_API_KEY) {
   throw new Error("Missing GEMINI_API_KEY / GOOGLE_API_KEY environment variable");
 }
 
-// Client 1 : Version "Entreprise/Vertex" (Nécessaire pour le File Search / RAG actuel)
+// Client RAG/Chat (Moteur Entreprise) - On garde ce qui marche pour le chatbot
 export const genAI = new GoogleGenAI({ 
   apiKey: GEMINI_API_KEY,
 });
-
-// Client 2 : Version "Standard/AI Studio" (Nécessaire pour la transcription audio avec cette clé)
-const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 type GeminiTextOptions = {
   model?: string;
@@ -40,15 +36,13 @@ export async function generateText(
   };
 
   if (options?.fileSearchStoreNames?.length) {
-    config.tools = [
-      {
+    config.tools = [{
         fileSearch: {
           fileSearchStoreNames: options.fileSearchStoreNames,
           metadataFilter: options.metadataFilter,
           topK: options.fileSearchTopK,
         },
-      },
-    ];
+    }];
   }
 
   const response = await genAI.models.generateContent({
@@ -75,15 +69,13 @@ export async function* generateTextStream(
   };
 
   if (options?.fileSearchStoreNames?.length) {
-    config.tools = [
-      {
+    config.tools = [{
         fileSearch: {
           fileSearchStoreNames: options.fileSearchStoreNames,
           metadataFilter: options.metadataFilter,
           topK: options.fileSearchTopK,
         },
-      },
-    ];
+    }];
   }
 
   const stream = await genAI.models.generateContentStream({
@@ -98,29 +90,58 @@ export async function* generateTextStream(
 }
 
 /**
- * Transcrit un contenu audio (via le moteur AI Studio Standard).
- * C'est cette version qui évite les erreurs 404 sur votre clé.
+ * Transcrit un contenu audio via l'API REST directe de Google.
+ * Évite tous les problèmes de version/compatibilité des SDK.
  */
 export async function transcribeAudio(
   base64Audio: string,
   mimeType: string,
-  options?: GeminiTextOptions
 ): Promise<string> {
-  const modelName = options?.model || "gemini-1.5-flash";
-  const model = aiStudio.getGenerativeModel({ model: modelName });
-  
+  // On utilise le nom COMPLET du modèle
+  const modelName = "gemini-1.5-flash-latest";
   const cleanMimeType = mimeType.split(";")[0];
-  const prompt = "Transcris exactement cet audio en français. Ne génère aucune autre phrase, aucun commentaire, aucun timestamp.";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+
+  const payload = {
+    contents: [{
+      parts: [
+        { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
+        { text: "Transcris exactement cet audio en français. Ne génère que le texte." }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 1024
+    }
+  };
 
   try {
-    const result = await model.generateContent([
-      { inlineData: { data: base64Audio, mimeType: cleanMimeType } },
-      { text: prompt }
-    ]);
-    const response = await result.response;
-    return response.text()?.trim() || "";
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorJson;
+      try { errorJson = JSON.parse(errorText); } catch { errorJson = errorText; }
+      
+      console.error("[REST API Error]", response.status, errorJson);
+      throw new Error(`Google API (HTTP ${response.status}): ${JSON.stringify(errorJson)}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) {
+      console.warn("[REST API Warning] Pas de texte dans la réponse", JSON.stringify(data));
+      return "";
+    }
+
+    return text.trim();
   } catch (error: any) {
-    console.error("[AI Studio Transcribe Error]", error.message);
-    throw new Error(`Erreur transcription : ${error.message}`);
+    console.error("[Transcribe Audio Error]", error.message);
+    throw error;
   }
 }
