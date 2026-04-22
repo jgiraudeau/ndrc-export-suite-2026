@@ -263,10 +263,17 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           formData.append("audio", audioBlob, "comment.webm");
 
           setDebugStep("4. Envoi IA...");
+          setDebugStep("4. Envoi IA...");
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s max
+
           const response = await fetch("/api/ai/transcribe", {
             method: "POST",
             body: formData,
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
 
           if (!response.ok) {
             const errData = await response.json().catch(() => ({}));

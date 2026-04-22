@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     const mimeType = file.type || "audio/webm";
 
     // Appel à la fonction unifiée du projet (lib/ai/gemini.ts)
+    console.log("[Transcribe] Calling Gemini...");
     const text = await transcribeAudio(base64Audio, mimeType);
 
     console.log("[Transcribe Success]", {
