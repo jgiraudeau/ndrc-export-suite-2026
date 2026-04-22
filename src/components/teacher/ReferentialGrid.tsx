@@ -226,7 +226,8 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
       
       const recorder = new MediaRecorder(stream, {
-        mimeType: supportedType
+        mimeType: supportedType,
+        audioBitsPerSecond: 128000 // Haute qualité pour une meilleure transcription
       });
       
       mediaRecorderRef.current = recorder;
@@ -241,9 +242,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         stream.getTracks().forEach(track => track.stop()); // Libérer le micro
 
-        if (audioBlob.size < 1000) {
+        if (audioBlob.size < 2000) { // Un peu plus de marge pour éviter les bruits parasites
             setListeningKey(null);
-            return; // Trop court
+            return; 
         }
 
         setTranscribingKey(key);

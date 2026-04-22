@@ -123,7 +123,7 @@ export async function transcribeAudio(
   options?: GeminiTextOptions
 ): Promise<string> {
   const model = options?.model || "gemini-2.5-flash-lite";
-  const prompt = "Transcription fidèle et naturelle de ce court commentaire audio pédagogique d'un professeur. Renvoie uniquement le texte transcrit, sans ajout d'intro/outro, sans ponctuation excessive. Si c'est inaudible ou vide, renvoie une chaîne vide.";
+  const prompt = "TRANSCRIPTION LITTÉRALE : Transcris mot à mot le contenu de cet audio. Ne reformule pas, n'ajoute rien, ne retire rien. Si le son est de mauvaise qualité, fais au mieux mais ne devine pas de phrases sans rapport. Renvoie uniquement le texte brut.";
 
   const config: GenerateContentConfig = {
     temperature: 0,
