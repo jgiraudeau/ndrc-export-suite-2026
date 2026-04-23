@@ -1,4 +1,5 @@
 import { GoogleGenAI, type GenerateContentConfig } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
@@ -91,15 +92,23 @@ export async function* generateTextStream(
 
 /**
  * Transcrit un contenu audio.
- * V20 : Utilisation de system_instruction pour éviter les répétitions.
+ * V22 : Utilisation de @google/generative-ai et gemini-1.5-flash pour la stabilité
  */
 export async function transcribeAudio(
   base64Audio: string,
   mimeType: string,
 ): Promise<string> {
   const cleanMimeType = mimeType.split(";")[0];
-  const modelName = "gemini-2.5-flash-lite"; 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+  
+  // Instanciation locale pour ne pas interférer avec le RAG (genAI)
+  const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const model = aiStudio.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 1024,
+      }
+  });
 
   const systemInstruction = `TU ES UN SYSTÈME DE TRANSCRIPTION LITTÉRALE AUTOMATIQUE.
 RÈGLES STRICTES :
@@ -108,42 +117,22 @@ RÈGLES STRICTES :
 3. NE DIS PAS "Bonjour" ou quoi que ce soit d'autre.
 4. Si silencieux, répond [VIDE].`;
 
-  const payload = {
-    system_instruction: {
-      parts: [{ text: systemInstruction }]
-    },
-    contents: [{
-      parts: [
-        { inlineData: { mimeType: cleanMimeType, data: base64Audio } }
-      ]
-    }],
-    generationConfig: {
-      temperature: 0,
-      maxOutputTokens: 1024,
-      topP: 0.1,
-      topK: 1
-    }
-  };
-
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    const result = await model.generateContent({
+      systemInstruction,
+      contents: [{
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
+          { text: "Transcrire" }
+        ]
+      }]
     });
 
-    if (!response.ok) {
-      const errorJson = await response.json().catch(() => ({}));
-      throw new Error(`Erreur API Google: ${JSON.stringify(errorJson)}`);
-    }
-
-    const data = await response.json();
-    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-    
-    // V22: On retourne tout ce que l'IA a trouvé pour le diagnostic
+    const resultText = result.response.text().trim();
     return resultText;
   } catch (error: any) {
     console.error("[Transcribe Audio Error]", error.message);
-    throw error;
+    throw new Error(`Erreur IA Transcription: ${error.message}`);
   }
 }

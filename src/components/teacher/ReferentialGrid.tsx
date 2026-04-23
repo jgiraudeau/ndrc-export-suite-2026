@@ -290,8 +290,15 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s max
 
+          const token = localStorage.getItem("ndrc_token");
+          const headers: HeadersInit = {};
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+          }
+
           const response = await fetch("/api/ai/transcribe", {
             method: "POST",
+            headers,
             body: formData,
             signal: controller.signal
           });
