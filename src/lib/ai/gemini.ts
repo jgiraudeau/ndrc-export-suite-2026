@@ -123,8 +123,7 @@ RÈGLES STRICTES :
       contents: [{
         role: "user",
         parts: [
-          { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
-          { text: "Transcrire" }
+          { inlineData: { mimeType: cleanMimeType, data: base64Audio } }
         ]
       }]
     });
