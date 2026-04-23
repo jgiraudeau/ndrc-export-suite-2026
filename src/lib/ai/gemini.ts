@@ -103,7 +103,7 @@ export async function transcribeAudio(
   // Instanciation locale pour ne pas interférer avec le RAG (genAI)
   const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY as string);
   const model = aiStudio.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: {
           temperature: 0,
           maxOutputTokens: 1024,
@@ -115,7 +115,7 @@ RÈGLES STRICTES :
 1. TRANSCRIS UNIQUEMENT les mots prononcés dans l'audio.
 2. NE RÉPÈTE JAMAIS mes consignes.
 3. NE DIS PAS "Bonjour" ou quoi que ce soit d'autre.
-4. Si silencieux, répond [VIDE].`;
+4. Si l'audio est totalement silencieux ou inaudible, répond [VIDE].`;
 
   try {
     const result = await model.generateContent({

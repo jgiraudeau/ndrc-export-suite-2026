@@ -251,7 +251,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       gainNode.connect(destination);
 
       const recorder = new MediaRecorder(destination.stream, {
-        mimeType: "audio/webm;codecs=opus",
+        mimeType: supportedType,
         audioBitsPerSecond: 128000
       });
       
