@@ -101,7 +101,7 @@ export async function transcribeAudio(
   const cleanMimeType = mimeType.split(";")[0];
   
   // Instanciation locale pour ne pas interférer avec le RAG (genAI)
-  const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY as string);
   const model = aiStudio.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       generationConfig: {
