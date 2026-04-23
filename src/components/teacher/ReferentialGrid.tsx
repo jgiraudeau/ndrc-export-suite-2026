@@ -257,7 +257,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const duration = (Date.now() - recordStartTimeRef.current) / 1000;
         stream.getTracks().forEach(track => track.stop()); // Libérer le micro
-        if (audioContext.state !== "closed") audioContext.close(); // Libérer les ressources audio
 
         if (duration < 1) { // Moins d'une seconde = erreur de manip
             setDebugStep("Trop court...");
