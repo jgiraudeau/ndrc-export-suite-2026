@@ -240,17 +240,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       
       if (!supportedType) throw new Error("Aucun format audio supporté");
 
-      // V22: Ajustement Gain (1.5x) pour éviter la saturation
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = 1.5; 
-      
-      const destination = audioContext.createMediaStreamDestination();
-      source.connect(gainNode);
-      gainNode.connect(destination);
-
-      const recorder = new MediaRecorder(destination.stream, {
+      const recorder = new MediaRecorder(stream, {
         mimeType: supportedType,
         audioBitsPerSecond: 128000
       });
