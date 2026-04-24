@@ -308,7 +308,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           setDebugStep(`4. Analyse IA Pro (${sizeKB}KB)...`);
           
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s max
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s max
 
           const token = localStorage.getItem("ndrc_token");
           const headers: HeadersInit = {};
@@ -355,8 +355,13 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           }
         } catch (err: any) {
           console.error("Transcription error detail:", err);
-          setRawDebug("ERROR: " + err.message);
-          setSaveError("Détail erreur : " + (err.message || "Échec inconnu"));
+          if (err.name === "AbortError" || err.message?.includes("aborted")) {
+             setRawDebug("ERROR: L'IA met trop de temps à répondre (Timeout 30s).");
+             setSaveError("Détail erreur : L'IA met trop de temps à répondre. Veuillez réessayer.");
+          } else {
+             setRawDebug("ERROR: " + err.message);
+             setSaveError("Détail erreur : " + (err.message || "Échec inconnu"));
+          }
         } finally {
           setTranscribingKey(null);
           setDebugStep(null);
