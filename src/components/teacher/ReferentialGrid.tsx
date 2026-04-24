@@ -226,8 +226,8 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         navigator.mediaDevices.getUserMedia({ 
           audio: {
             channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true
+            echoCancellation: false,
+            noiseSuppression: false
           } 
         }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout micro (3s)")), 3000))
@@ -302,7 +302,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           const cleanText = data.text ? data.text.trim() : "";
           setRawDebug(cleanText || JSON.stringify(data));
 
-          if (cleanText && cleanText !== "[VIDE]") {
+          if (cleanText && !["[VIDE]", "[SILENCE]", "[BRUIT]"].includes(cleanText)) {
             setCurrentComments((prev) => {
               const current = prev[key] || "";
               const updated = current + (current ? " " : "") + cleanText;
@@ -316,7 +316,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                 triggerAutoSave(competencyCode);
             }
           } else {
-            const msg = "Aucune parole claire détectée par l'IA. Parlez plus fort ou vérifiez votre micro.";
+            const msg = cleanText === "[BRUIT]" 
+                ? "L'IA n'entend que du bruit de fond. Parlez plus distinctement."
+                : "Aucune parole claire détectée par l'IA. Parlez plus fort ou vérifiez votre micro.";
             setSaveError(msg);
             setTimeout(() => setSaveError(current => current === msg ? null : current), 8000);
           }
