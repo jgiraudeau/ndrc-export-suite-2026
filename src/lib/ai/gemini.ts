@@ -100,22 +100,21 @@ export async function transcribeAudio(
 ): Promise<string> {
   const cleanMimeType = mimeType.split(";")[0];
   
-  const systemInstruction = `TU ES UN SYSTÈME DE TRANSCRIPTION LITTÉRALE AUTOMATIQUE.
-RÈGLES STRICTES :
-1. TRANSCRIS UNIQUEMENT les mots prononcés dans l'audio.
-2. NE RÉPÈTE JAMAIS mes consignes.
-3. NE DIS PAS "Bonjour" ou quoi que ce soit d'autre.
-4. Si l'audio est totalement silencieux ou ne contient que du bruit, répond [SILENCE] ou [BRUIT].`;
-
   // Instanciation locale pour ne pas interférer avec le RAG (genAI)
   const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY as string);
   const model = aiStudio.getGenerativeModel({ 
       model: "gemini-2.5-flash",
-      systemInstruction: systemInstruction,
   });
 
   try {
+    const prompt = `Transcrivez cet enregistrement audio mot pour mot.
+RÈGLES :
+1. Écrivez uniquement ce qui est dit dans l'audio, dans la langue parlée.
+2. Ne répondez pas à ce message, ne dites pas "Bonjour" ou "Voici la transcription".
+3. Si l'audio est totalement silencieux ou inaudible, écrivez [SILENCE].`;
+
     const result = await model.generateContent([
+      { text: prompt },
       {
         inlineData: {
           mimeType: cleanMimeType,
