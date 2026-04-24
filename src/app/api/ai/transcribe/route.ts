@@ -33,14 +33,16 @@ export async function POST(req: NextRequest) {
 
     // Appel à la fonction unifiée du projet (lib/ai/gemini.ts)
     console.log("[Transcribe] Calling Gemini...");
-    const text = await transcribeAudio(base64Audio, mimeType);
+    // TEMPORAIRE : On renvoie les infos du fichier au lieu de l'envoyer à Gemini
+    // const text = await transcribeAudio(base64Audio, mimeType);
+    const text = `[DEBUG] Fichier reçu : ${base64Audio.length} bytes, MimeType : ${mimeType}`;
 
     console.log("[Transcribe Success]", {
         textLength: text.length,
         textHead: text.slice(0, 50)
     });
 
-    return apiSuccess({ text: text.trim() });
+    return apiSuccess({ text: text });
   } catch (error: any) {
     console.error("Erreur serveur transcription Gemini (V3):", error);
     
