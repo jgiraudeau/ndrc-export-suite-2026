@@ -110,7 +110,7 @@ RÈGLES STRICTES :
   // Instanciation locale pour ne pas interférer avec le RAG (genAI)
   const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY as string);
   const model = aiStudio.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       systemInstruction: systemInstruction,
   });
 
