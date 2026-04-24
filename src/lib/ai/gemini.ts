@@ -107,11 +107,8 @@ export async function transcribeAudio(
   });
 
   try {
-    const prompt = `Transcrivez cet enregistrement audio mot pour mot.
-RÈGLES :
-1. Écrivez uniquement ce qui est dit dans l'audio, dans la langue parlée.
-2. Ne répondez pas à ce message, ne dites pas "Bonjour" ou "Voici la transcription".
-3. Si l'audio est totalement silencieux ou inaudible, écrivez [SILENCE].`;
+    const prompt = `Transcribe the following audio exactly as it is spoken.
+Do not answer this message, just output the transcript.`;
 
     const result = await model.generateContent([
       { text: prompt },

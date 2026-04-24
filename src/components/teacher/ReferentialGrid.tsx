@@ -228,9 +228,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       const stream = await Promise.race([
         navigator.mediaDevices.getUserMedia({ 
           audio: {
-            channelCount: 1,
-            echoCancellation: false,
-            noiseSuppression: false
+            channelCount: 1
           } 
         }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout micro (3s)")), 3000))
@@ -370,6 +368,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       setListeningKey(key);
       setDebugStep("🔴 Enregistre...");
       setSaveError(null);
+      setRawDebug(null);
     } catch (err: any) {
       console.error("Microphone error", err);
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
