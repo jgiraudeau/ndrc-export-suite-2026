@@ -227,9 +227,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       setDebugStep("1. Demande micro...");
       const stream = await Promise.race([
         navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            channelCount: 1
-          } 
+          audio: true
         }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout micro (3s)")), 3000))
       ]);
@@ -242,28 +240,15 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       if (!supportedType) throw new Error("Aucun format audio supporté");
 
       const recorder = new MediaRecorder(stream, {
-        mimeType: supportedType
+        mimeType: supportedType,
+        audioBitsPerSecond: 128000
       });
 
-      // Visualiseur de niveau (AudioContext séparé pour le debug)
+      // Visualiseur désactivé temporairement pour éviter les bugs de flux Chrome Mac
       try {
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        if (audioCtx.state === 'suspended') {
-          await audioCtx.resume();
-        }
-        const analyser = audioCtx.createAnalyser();
-        const source = audioCtx.createMediaStreamSource(stream);
-        source.connect(analyser);
-        analyser.fftSize = 64;
-        analyserRef.current = analyser;
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
         const updateLevel = () => {
-          if (!analyserRef.current) return;
-          analyserRef.current.getByteFrequencyData(dataArray);
-          const sum = dataArray.reduce((a, b) => a + b, 0);
-          const average = sum / dataArray.length;
-          setAudioLevel(average);
+          // Fake animation pour le test
+          setAudioLevel(Math.random() * 50 + 20);
           animationFrameRef.current = requestAnimationFrame(updateLevel);
         };
         updateLevel();
@@ -368,7 +353,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         }
       };
 
-      recorder.start(500); // Important pour Safari : envoyer des chunks réguliers
+      recorder.start(); 
       recordStartTimeRef.current = Date.now();
       setListeningKey(key);
       setDebugStep("🔴 Enregistre...");
