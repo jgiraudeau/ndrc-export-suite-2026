@@ -110,24 +110,19 @@ RÈGLES STRICTES :
   // Instanciation locale pour ne pas interférer avec le RAG (genAI)
   const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY as string);
   const model = aiStudio.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       systemInstruction: systemInstruction,
-      generationConfig: {
-          temperature: 0,
-          maxOutputTokens: 1024,
-      }
   });
 
   try {
-    const result = await model.generateContent({
-      contents: [{
-        role: "user",
-        parts: [
-          { inlineData: { mimeType: cleanMimeType, data: base64Audio } },
-          { text: "Veuillez transcrire l'audio ci-joint." }
-        ]
-      }]
-    });
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: cleanMimeType,
+          data: base64Audio
+        }
+      }
+    ]);
 
     const resultText = result.response.text().trim();
     return resultText;
