@@ -244,13 +244,15 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       if (!supportedType) throw new Error("Aucun format audio supporté");
 
       const recorder = new MediaRecorder(stream, {
-        mimeType: supportedType,
-        audioBitsPerSecond: 128000
+        mimeType: supportedType
       });
 
       // Visualiseur de niveau (AudioContext séparé pour le debug)
       try {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
         const analyser = audioCtx.createAnalyser();
         const source = audioCtx.createMediaStreamSource(stream);
         source.connect(analyser);
@@ -363,7 +365,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         }
       };
 
-      recorder.start();
+      recorder.start(500); // Important pour Safari : envoyer des chunks réguliers
       recordStartTimeRef.current = Date.now();
       setListeningKey(key);
       setDebugStep("🔴 Enregistre...");
