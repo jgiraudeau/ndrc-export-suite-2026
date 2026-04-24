@@ -284,6 +284,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         analyserRef.current = null;
         
         const mimeType = recorder.mimeType || "audio/webm";
+        const extension = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const duration = (Date.now() - recordStartTimeRef.current) / 1000;
         stream.getTracks().forEach(track => track.stop()); // Libérer le micro
@@ -301,7 +302,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
         try {
           const formData = new FormData();
-          formData.append("audio", audioBlob, "comment.webm");
+          formData.append("audio", audioBlob, `comment.${extension}`);
 
           const sizeKB = Math.round(audioBlob.size / 1024);
           setDebugStep(`4. Analyse IA Pro (${sizeKB}KB)...`);
