@@ -638,6 +638,16 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                      </div>
                                    )}
 
+                                  {isListening && (
+                                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-1 mb-2">
+                                      <motion.div 
+                                        className="h-full bg-red-500"
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${Math.min(100, audioLevel * 2.5)}%` }}
+                                        transition={{ type: "spring", bounce: 0, duration: 0.1 }}
+                                      />
+                                    </div>
+                                  )}
                                   <textarea
                                     value={currentComments[key] || ""}
                                     onChange={(e) => handleCommentChange(key, e.target.value)}
