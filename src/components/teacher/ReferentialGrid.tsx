@@ -87,6 +87,9 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   const [rawDebug, setRawDebug] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null); // Note: reused for MediaRecorder in some places or kept for legacy cleanup
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordStartTimeRef = useRef<number>(0);
 
@@ -244,6 +247,29 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         mimeType: supportedType,
         audioBitsPerSecond: 128000
       });
+
+      // Visualiseur de niveau (AudioContext séparé pour le debug)
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const analyser = audioCtx.createAnalyser();
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyser.fftSize = 64;
+        analyserRef.current = analyser;
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        const updateLevel = () => {
+          if (!analyserRef.current) return;
+          analyserRef.current.getByteFrequencyData(dataArray);
+          const sum = dataArray.reduce((a, b) => a + b, 0);
+          const average = sum / dataArray.length;
+          setAudioLevel(average);
+          animationFrameRef.current = requestAnimationFrame(updateLevel);
+        };
+        updateLevel();
+      } catch (e) {
+        console.warn("Visualizer failed", e);
+      }
       
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
@@ -253,6 +279,10 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       };
 
       recorder.onstop = async () => {
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        setAudioLevel(0);
+        analyserRef.current = null;
+        
         const mimeType = recorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const duration = (Date.now() - recordStartTimeRef.current) / 1000;
@@ -685,6 +715,16 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
               )}
             </div>
           </div>
+          {listeningKey === "GLOBAL" && (
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-4">
+              <motion.div 
+                className="h-full bg-purple-500"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, audioLevel * 2.5)}%` }}
+                transition={{ type: "spring", bounce: 0, duration: 0.1 }}
+              />
+            </div>
+          )}
           <textarea
             value={globalComment}
             onChange={(e) => { setGlobalComment(e.target.value); setGlobalCommentDirty(true); }}
