@@ -3,6 +3,8 @@ import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 import { transcribeAudio } from "@/lib/ai/gemini";
 import OpenAI from "openai";
 
+export const maxDuration = 60;
+
 function normalizeTranscript(input: string): string {
   return input
     .toLowerCase()
@@ -26,6 +28,15 @@ function isGenericHallucinationLike(text: string): boolean {
   if (/^le\s+\w+\s+est\s+\w+/.test(t)) return true;
   if (/^this is|^hello\b|^bonjour\b/.test(t)) return true;
   return false;
+}
+
+function readTranscriptionText(result: unknown): string {
+  if (typeof result === "string") return result.trim();
+  if (result && typeof result === "object" && "text" in result) {
+    const text = (result as { text?: unknown }).text;
+    return typeof text === "string" ? text.trim() : "";
+  }
+  return "";
 }
 
 export async function POST(req: NextRequest) {
@@ -71,6 +82,9 @@ export async function POST(req: NextRequest) {
     if (!allowedMimeTypes.has(mimeType)) {
       return apiError(`Format audio non supporté: ${mimeType}`, 415);
     }
+    if (file.size <= 4096) {
+      return apiSuccess({ text: "[SILENCE]" });
+    }
 
     let text = "";
     let bestEffort = "";
@@ -79,47 +93,20 @@ export async function POST(req: NextRequest) {
       try {
         console.log("[Transcribe] Calling OpenAI...");
         const openai = new OpenAI({ apiKey: openaiKey });
-
-        const attempts: Array<{ model: string; language?: string }> = [
-          { model: "gpt-4o-transcribe", language: "fr" },
-          { model: "gpt-4o-mini-transcribe", language: "fr" },
-          { model: "whisper-1", language: "fr" },
-        ];
-
-        const candidates: string[] = [];
-        for (const attempt of attempts) {
-          const fileForAttempt = new File([buffer], file.name || "comment.webm", {
-            type: mimeType,
-          });
-          const result = await openai.audio.transcriptions.create({
-            model: attempt.model,
-            file: fileForAttempt,
-            language: attempt.language,
-            response_format: "text",
-          });
-          const candidate = (typeof result === "string" ? result : String(result || "")).trim();
-          if (candidate && !["[BRUIT]", "[SILENCE]", "[VIDE]"].includes(candidate)) {
-            candidates.push(candidate);
-            if (candidate.length > bestEffort.length) bestEffort = candidate;
-          }
-        }
-
-        if (candidates.length > 0) {
-          const byNorm = new Map<string, { count: number; value: string }>();
-          for (const candidate of candidates) {
-            const norm = normalizeTranscript(candidate);
-            const prev = byNorm.get(norm);
-            byNorm.set(norm, { count: (prev?.count || 0) + 1, value: candidate });
-          }
-          const sorted = Array.from(byNorm.values()).sort((a, b) => b.count - a.count);
-          const best = sorted[0];
-          // On accepte directement un consensus (au moins 2 modèles)
-          if (best && best.count >= 2) {
-            text = best.value.trim();
-          } else {
-            // Sinon, on prend la plus longue candidate seulement si elle n'est pas "générique"
-            const longest = [...candidates].sort((a, b) => b.length - a.length)[0] || "";
-            if (!isGenericHallucinationLike(longest)) text = longest.trim();
+        const audioFile = new File([buffer], file.name || "comment.webm", {
+          type: mimeType,
+        });
+        const result = await openai.audio.transcriptions.create({
+          model: "gpt-4o-mini-transcribe",
+          file: audioFile,
+          language: "fr",
+          prompt: "Transcription fidèle en français d'un commentaire d'évaluation BTS NDRC. Ne pas inventer.",
+        });
+        const candidate = readTranscriptionText(result);
+        if (candidate && !["[BRUIT]", "[SILENCE]", "[VIDE]"].includes(candidate)) {
+          bestEffort = candidate;
+          if (!isGenericHallucinationLike(candidate)) {
+            text = candidate;
           }
         }
       } catch (openaiError: any) {

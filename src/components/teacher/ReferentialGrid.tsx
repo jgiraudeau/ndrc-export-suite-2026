@@ -256,7 +256,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const token = localStorage.getItem("ndrc_token");
       const headers: HeadersInit = {};
@@ -291,7 +291,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     } catch (err: any) {
       console.error("Transcription error detail:", err);
       if (err.name === "AbortError" || err.message?.includes("aborted")) {
-        setRawDebug("ERROR: L'IA met trop de temps à répondre (Timeout 30s).");
+        setRawDebug("ERROR: L'IA met trop de temps à répondre (Timeout 60s).");
         setSaveError("Détail erreur : L'IA met trop de temps à répondre. Veuillez réessayer.");
       } else {
         setRawDebug("ERROR: " + err.message);
@@ -461,14 +461,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     try {
       setDebugStep("1. Demande micro...");
       const stream = await Promise.race([
-        navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            channelCount: 1,
-          }
-        }),
+        navigator.mediaDevices.getUserMedia({ audio: true }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout micro (3s)")), 3000))
       ]);
       
@@ -533,7 +526,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
           setDebugStep(`4. Analyse IA Pro (${sizeKB}KB)...`);
           
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s max
+          const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s max
 
           const token = localStorage.getItem("ndrc_token");
           const headers: HeadersInit = {};
@@ -569,7 +562,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         } catch (err: any) {
           console.error("Transcription error detail:", err);
           if (err.name === "AbortError" || err.message?.includes("aborted")) {
-            setRawDebug("ERROR: L'IA met trop de temps à répondre (Timeout 30s).");
+             setRawDebug("ERROR: L'IA met trop de temps à répondre (Timeout 60s).");
             setSaveError("Détail erreur : L'IA met trop de temps à répondre. Veuillez réessayer.");
           } else {
             setRawDebug("ERROR: " + err.message);
@@ -581,7 +574,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         }
       };
 
-      recorder.start(); 
+      recorder.start(1000);
       recordStartTimeRef.current = Date.now();
       setListeningKey(key);
       setDebugStep("🔴 Enregistre...");
