@@ -1,20 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Globe, ShoppingBag, ExternalLink } from "lucide-react";
 
-export default function Page() {
-  const [wpUrl, setWpUrl] = useState<string | null>(null);
-  const [prestaUrl, setPrestaUrl] = useState<string | null>(null);
+type StudentSites = {
+  wpUrl: string | null;
+  prestaUrl: string | null;
+};
 
-  useEffect(() => {
-    const userStr = localStorage.getItem("ndrc_user");
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      setWpUrl(user.wpUrl || null);
-      setPrestaUrl(user.prestaUrl || null);
-    }
-  }, []);
+const emptySites: StudentSites = { wpUrl: null, prestaUrl: null };
+
+function getStoredSites(): StudentSites {
+  if (typeof window === "undefined") return emptySites;
+
+  const userStr = localStorage.getItem("ndrc_user");
+  if (!userStr) return emptySites;
+
+  try {
+    const user = JSON.parse(userStr) as Partial<StudentSites>;
+    return {
+      wpUrl: user.wpUrl || null,
+      prestaUrl: user.prestaUrl || null,
+    };
+  } catch {
+    return emptySites;
+  }
+}
+
+export default function Page() {
+  const { wpUrl, prestaUrl } = useSyncExternalStore(
+    () => () => undefined,
+    getStoredSites,
+    () => emptySites
+  );
 
   return (
     <>

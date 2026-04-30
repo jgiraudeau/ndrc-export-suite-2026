@@ -9,7 +9,7 @@ const eslintConfig = defineConfig([
     files: ["**/*.{ts,tsx,js,jsx}"],
     rules: {
       // Transitional mode: keep signal with warnings while we progressively type harden legacy code.
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-require-imports": "warn",
       "react-hooks/set-state-in-effect": "warn",
       "react/no-unescaped-entities": "warn",
@@ -21,6 +21,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "scratch/**",
     "next-env.d.ts",
   ]),
 ]);

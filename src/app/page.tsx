@@ -25,6 +25,7 @@ export default function LandingPage() {
                         alt="Logo FullNDRC"
                         width={210}
                         height={48}
+                        style={{ width: "auto", height: "auto" }}
                         priority
                     />
                 </div>
@@ -116,6 +117,7 @@ export default function LandingPage() {
                         alt="Logo FullNDRC"
                         width={170}
                         height={40}
+                        style={{ width: "auto", height: "auto" }}
                     />
                 </div>
                 <p>© {new Date().getFullYear()} - La plateforme de réussite pour le BTS Négociation et Digitalisation de la Relation Client.</p>

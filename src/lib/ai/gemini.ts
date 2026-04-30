@@ -97,6 +97,7 @@ export async function* generateTextStream(
 export async function transcribeAudio(
   base64Audio: string,
   mimeType: string,
+  languageHint = "fr-FR",
 ): Promise<string> {
   const cleanMimeType = mimeType.split(";")[0];
   
@@ -104,11 +105,25 @@ export async function transcribeAudio(
   const aiStudio = new GoogleGenerativeAI(GEMINI_API_KEY as string);
   const model = aiStudio.getGenerativeModel({ 
       model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0,
+        topP: 0.05,
+        topK: 1,
+        maxOutputTokens: 256,
+      },
   });
 
   try {
-    const prompt = `Transcribe the following audio exactly as it is spoken.
-Do not answer this message, just output the transcript.`;
+    const prompt = `Tu es un moteur de transcription audio.
+Langue attendue: ${languageHint} (français).
+Règles strictes :
+- Transcris EXACTEMENT ce qui est prononcé, sans reformuler et sans traduire.
+- Privilégie une reconnaissance en français (France) pour les homophones et la ponctuation.
+- Si l'audio est silencieux, inaudible ou trop ambigu, réponds uniquement [SILENCE].
+- Si c'est surtout du bruit de fond, réponds uniquement [BRUIT].
+- Si aucun mot n'est identifiable, réponds uniquement [VIDE].
+- N'invente jamais de contenu.
+- Réponds avec une seule ligne, sans guillemets ni explication.`;
 
     const result = await model.generateContent([
       { text: prompt },
@@ -121,7 +136,18 @@ Do not answer this message, just output the transcript.`;
     ]);
 
     const resultText = result.response.text().trim();
-    return resultText;
+    const oneLine = resultText.split("\n").map((line) => line.trim()).filter(Boolean)[0] || "";
+    const normalizedTag = oneLine.toUpperCase();
+
+    if (normalizedTag === "[SILENCE]" || normalizedTag === "[BRUIT]" || normalizedTag === "[VIDE]") {
+      return normalizedTag;
+    }
+
+    // Filet de sécurité contre les réponses méta / inventées
+    if (!oneLine || oneLine.length < 2) return "[VIDE]";
+    if (/^I (can|cannot|can't)|^Je (peux|ne peux pas)|^Sorry|^Désolé/i.test(oneLine)) return "[SILENCE]";
+
+    return oneLine;
   } catch (error: any) {
     console.error("[Transcribe Audio Error]", error.message);
     throw new Error(`Erreur IA Transcription: ${error.message}`);

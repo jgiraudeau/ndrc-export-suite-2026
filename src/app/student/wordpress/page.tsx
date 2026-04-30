@@ -53,7 +53,11 @@ export default function WordPressSkills() {
     setSaving(skillId);
     setAcquired((prev) => {
       const s = new Set(prev);
-      next ? s.add(skillId) : s.delete(skillId);
+      if (next) {
+        s.add(skillId);
+      } else {
+        s.delete(skillId);
+      }
       return s;
     });
 
@@ -67,7 +71,11 @@ export default function WordPressSkills() {
       // rollback on error
       setAcquired((prev) => {
         const s = new Set(prev);
-        next ? s.delete(skillId) : s.add(skillId);
+        if (next) {
+          s.delete(skillId);
+        } else {
+          s.add(skillId);
+        }
         return s;
       });
     } finally {
