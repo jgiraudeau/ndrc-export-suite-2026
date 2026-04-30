@@ -339,11 +339,11 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
       mediaRecorderRef.current.stop();
     }
 
-    // 1) Priorité à la reconnaissance vocale native (plus fiable pour dictée FR en direct)
+    // 1) Priorité à la reconnaissance vocale native Chrome.
+    // Elle évite le cas MediaRecorder où certains postes Mac produisent seulement
+    // un conteneur WebM quasi vide malgré une permission micro accordée.
     const browserSpeechCtor = ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) as BrowserSpeechRecognitionCtor | undefined;
-    // Désactivé: la reco navigateur renvoie trop de faux négatifs sur ce poste.
-    // On force la voie serveur (Whisper) pour stabiliser la dictée.
-    if (false && browserSpeechCtor) {
+    if (browserSpeechCtor) {
       try {
         const recognition = new (browserSpeechCtor as BrowserSpeechRecognitionCtor)();
         recognitionRef.current = recognition;
@@ -383,9 +383,10 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
               speechFallbackRecorderRef.current = null;
 
               if (!speechFallbackUseServerRef.current) return;
-              if (duration < 1 || blob.size === 0) {
-                setSaveError("Aucune parole claire détectée. Réessayez en parlant un peu plus près du micro.");
-                setTimeout(() => setSaveError((current) => current?.includes("Aucune parole claire") ? null : current), 6000);
+              if (duration < 1 || blob.size < 4096) {
+                setRawDebug(`Audio capturé trop petit: ${blob.size} octets`);
+                setSaveError("Le navigateur n'a presque pas capturé d'audio. Vérifiez le micro sélectionné dans Chrome puis réessayez.");
+                setTimeout(() => setSaveError((current) => current?.includes("presque pas capturé") ? null : current), 10000);
                 return;
               }
 
@@ -418,6 +419,12 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
 
         recognition.onerror = (event: any) => {
           console.error("SpeechRecognition error:", event);
+          speechFallbackUseServerRef.current = true;
+          if (speechFallbackRecorderRef.current && speechFallbackRecorderRef.current.state !== "inactive") {
+            setDebugStep("3. Bascule transcription serveur...");
+            speechFallbackRecorderRef.current.stop();
+            return;
+          }
           setSaveError("Échec reconnaissance vocale navigateur. Vérifiez micro et autorisation.");
           setListeningKey(null);
           setDebugStep(null);
@@ -477,17 +484,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
         audioBitsPerSecond: 128000
       });
 
-      // Visualiseur désactivé temporairement pour éviter les bugs de flux Chrome Mac
-      try {
-        const updateLevel = () => {
-          // Fake animation pour le test
-          setAudioLevel(Math.random() * 50 + 20);
-          animationFrameRef.current = requestAnimationFrame(updateLevel);
-        };
-        updateLevel();
-      } catch (e) {
-        console.warn("Visualizer failed", e);
-      }
+      setAudioLevel(0);
       
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
@@ -511,6 +508,14 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
             setDebugStep("Trop court...");
             setTimeout(() => setDebugStep(null), 2000);
             setListeningKey(null);
+            return;
+        }
+        if (audioBlob.size < 4096) {
+            setDebugStep(null);
+            setListeningKey(null);
+            setSaveError("Le navigateur n'a presque pas capturé d'audio. Vérifiez le micro sélectionné dans Chrome puis réessayez.");
+            setRawDebug(`Audio capturé trop petit: ${audioBlob.size} octets`);
+            setTimeout(() => setSaveError((current) => current?.includes("presque pas capturé") ? null : current), 10000);
             return;
         }
 
