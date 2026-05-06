@@ -121,6 +121,11 @@ export default function LandingPage() {
                     />
                 </div>
                 <p>© {new Date().getFullYear()} - La plateforme de réussite pour le BTS Négociation et Digitalisation de la Relation Client.</p>
+                <div className="flex items-center justify-center gap-4 mt-3">
+                    <Link href="/cgu" className="hover:text-slate-400 transition-colors">CGU</Link>
+                    <span>·</span>
+                    <Link href="/privacy" className="hover:text-slate-400 transition-colors">Politique de confidentialité</Link>
+                </div>
             </footer>
         </div>
     );
