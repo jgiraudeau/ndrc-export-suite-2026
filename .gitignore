@@ -26,3 +26,6 @@ npm-debug.log*
 # Fichiers de test locaux
 scratch/
 tmp_check_prisma.js
+
+# Sauvegardes base de données
+backups/
