@@ -22,6 +22,7 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { proxyProofUrl } from "@/lib/proof-url";
 
 interface JournalEntry {
     id: string;
@@ -330,9 +331,9 @@ export default function StudentJournalPage() {
                                                             {log.links && log.links.length > 0 && (
                                                                 <div className="flex gap-2">
                                                                     {log.links.map((link, idx) => (
-                                                                        <a 
+                                                                        <a
                                                                             key={idx}
-                                                                            href={link.startsWith('http') ? link : `https://${link}`}
+                                                                            href={proxyProofUrl(link.startsWith('http') ? link : `https://${link}`)}
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
                                                                             className="text-purple-600 hover:text-purple-700 p-1 bg-purple-50 rounded-md"

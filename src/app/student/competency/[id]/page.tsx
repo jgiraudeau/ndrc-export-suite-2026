@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle, Save, Globe, UploadCloud, Loader2, Image as ImageIcon, BrainCircuit, X, Star, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiGetProgress, apiSaveProgress, type ProgressRecord } from "@/lib/api-client";
+import { isProofBlobUrl, proxyProofUrl } from "@/lib/proof-url";
 import { ALL_COMPETENCIES } from "@/data/competencies";
 import { QUIZZES } from "@/data/quizzes";
 import { cn } from "@/lib/utils";
@@ -164,7 +165,8 @@ export default function CompetencyProofPage() {
         }
     };
 
-    const isImageProof = proofInput.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || proofInput.includes(".vercel.app/proofs/");
+    const isImageProof = proofInput.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i) || isProofBlobUrl(proofInput);
+    const proofDisplayUrl = proxyProofUrl(proofInput);
 
     return (
         <>
@@ -294,7 +296,7 @@ export default function CompetencyProofPage() {
                                         <ImageIcon size={14} /> Aperçu de l&apos;image
                                     </div>
                                     <Image
-                                        src={proofInput}
+                                        src={proofDisplayUrl}
                                         alt="Preuve"
                                         width={640}
                                         height={320}

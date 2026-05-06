@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         const cleanName = `proof-${auth.payload.sub}-${Date.now()}.${fileExtension}`;
 
         const blob = await put(`proofs/${cleanName}`, file, {
-            access: 'public',
+            access: 'private',
         });
 
         await writeAuditLog({
