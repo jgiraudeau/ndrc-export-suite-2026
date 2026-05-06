@@ -22,3 +22,7 @@ npm-debug.log*
 
 # Vercel
 .vercel
+
+# Fichiers de test locaux
+scratch/
+tmp_check_prisma.js

@@ -4,9 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { signToken } from "@/lib/jwt";
 import { apiError, apiSuccess } from "@/lib/api-helpers";
 import { teacherLoginSchema } from "@/lib/validations";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // POST /api/auth/teacher/login
 export async function POST(request: NextRequest) {
+    const rateLimit = checkRateLimit(request, "auth:teacher-login", 10, 10 * 60 * 1000);
+    if (rateLimit) return rateLimit;
+
     try {
         const body = await request.json();
         const parseResult = teacherLoginSchema.safeParse(body);
@@ -45,7 +49,7 @@ export async function POST(request: NextRequest) {
         });
 
         // Configurer la réponse avec le cookie
-        const response = apiSuccess({ token, name: teacher.name, role: "TEACHER" });
+        const response = apiSuccess({ name: teacher.name, role: "TEACHER" });
         response.cookies.set("ndrc_token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",

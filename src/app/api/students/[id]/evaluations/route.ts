@@ -1,16 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { extractToken, verifyToken } from "@/lib/jwt";
+import { requireAuth } from "@/lib/api-helpers";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAuth(req, ["TEACHER", "STUDENT", "ADMIN"]);
+  if ("status" in auth) return auth;
+
   try {
     const { id: studentId } = await params;
-    const token = extractToken(req);
-    const auth = await verifyToken(token || "");
-    if (!auth) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true, teacherId: true },
+    });
+
+    if (!student) {
+      return NextResponse.json({ error: "Étudiant introuvable" }, { status: 404 });
+    }
+
+    if (auth.payload.role === "STUDENT" && auth.payload.sub !== student.id) {
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    }
+
+    if (auth.payload.role === "TEACHER" && auth.payload.sub !== student.teacherId) {
+      return NextResponse.json({ error: "Étudiant introuvable" }, { status: 404 });
+    }
 
     // Fetch all progress records starting with E4 or E6
     const progress = await prisma.progress.findMany({

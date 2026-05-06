@@ -2,10 +2,14 @@ import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { apiError, apiSuccess } from "@/lib/api-helpers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // POST /api/auth/teacher/register
 // Crée le premier compte formateur (protéger avec une clé admin en prod)
 export async function POST(request: NextRequest) {
+    const rateLimit = checkRateLimit(request, "auth:teacher-register", 5, 60 * 60 * 1000);
+    if (rateLimit) return rateLimit;
+
     try {
         const { email, password, name } = await request.json();
 

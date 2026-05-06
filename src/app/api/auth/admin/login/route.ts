@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signToken } from "@/lib/jwt";
 import { apiError, apiSuccess } from "@/lib/api-helpers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Liste des emails autorisés à accéder à l'interface d'administration
 const AUTHORIZED_ADMIN_EMAILS = [
@@ -12,6 +13,9 @@ const AUTHORIZED_ADMIN_EMAILS = [
 
 // POST /api/auth/admin/login
 export async function POST(request: NextRequest) {
+    const rateLimit = checkRateLimit(request, "auth:admin-login", 8, 10 * 60 * 1000);
+    if (rateLimit) return rateLimit;
+
     try {
         const { email, password } = await request.json();
 
@@ -60,10 +64,9 @@ export async function POST(request: NextRequest) {
             name: teacher?.name || "Administrateur Système",
         });
 
-        const response = apiSuccess({ 
-            token, 
-            name: teacher?.name || "Administrateur", 
-            role: "ADMIN" 
+        const response = apiSuccess({
+            name: teacher?.name || "Administrateur",
+            role: "ADMIN",
         });
 
         // Configurer la réponse avec le cookie pour le middleware
@@ -83,4 +86,3 @@ export async function POST(request: NextRequest) {
         return apiError("Erreur serveur lors de la connexion admin", 500);
     }
 }
-

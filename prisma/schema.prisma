@@ -237,3 +237,40 @@ model ChatMessage {
   createdAt DateTime    @default(now())
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  String
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+}
+
+model AiUsageLog {
+  id              String   @id @default(cuid())
+  actorId         String?
+  actorRole       String
+  feature         String
+  model           String?
+  status          String
+  promptChars     Int      @default(0)
+  responseChars   Int      @default(0)
+  estimatedTokens Int      @default(0)
+  errorMessage    String?
+  metadata        Json?
+  ipAddress       String?
+  createdAt       DateTime @default(now())
+
+  @@index([actorId, feature, createdAt])
+  @@index([feature, createdAt])
+  @@index([actorRole, createdAt])
+  @@index([status, createdAt])
+}

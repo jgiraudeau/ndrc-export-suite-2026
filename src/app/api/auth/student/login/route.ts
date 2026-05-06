@@ -4,9 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { signToken } from "@/lib/jwt";
 import { apiError, apiSuccess } from "@/lib/api-helpers";
 import { studentLoginSchema } from "@/lib/validations";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // POST /api/auth/student/login
 export async function POST(request: NextRequest) {
+    const rateLimit = checkRateLimit(request, "auth:student-login", 10, 10 * 60 * 1000);
+    if (rateLimit) return rateLimit;
+
     try {
         const body = await request.json();
         const parseResult = studentLoginSchema.safeParse(body);
@@ -40,7 +44,6 @@ export async function POST(request: NextRequest) {
 
         // Configurer la réponse avec le cookie
         const response = apiSuccess({
-            token,
             name: `${student.firstName} ${student.lastName}`,
             role: "STUDENT",
             classCode: student.class.code,
