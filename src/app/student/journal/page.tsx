@@ -74,13 +74,15 @@ export default function StudentJournalPage() {
 
     const fetchData = useCallback(async () => {
         try {
-            const token = localStorage.getItem("ndrc_token");
-            if (!token) { router.push("/student/login"); return; }
-
             const [missionsRes, expRes] = await Promise.all([
-                fetch("/api/student/missions", { headers: { Authorization: `Bearer ${token}` } }),
-                fetch("/api/experiences", { headers: { Authorization: `Bearer ${token}` } }) // Needs studentId filter, usually handled by API if token present
+                fetch("/api/student/missions"),
+                fetch("/api/experiences")
             ]);
+
+            if (missionsRes.status === 401 || expRes.status === 401) {
+                router.push("/student/login");
+                return;
+            }
 
             const missions = await missionsRes.json();
             const experiences = await expRes.json();

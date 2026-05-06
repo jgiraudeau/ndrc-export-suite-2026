@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
+import { writeAuditLog } from "@/lib/audit-log";
+import { deleteBlobReferences } from "@/lib/blob-cleanup";
 
 // GET /api/students/[id] — détail complet d'un étudiant (formateur)
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -123,6 +125,15 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             data: dataToUpdate,
         });
 
+        await writeAuditLog({
+            actor: auth.payload,
+            action: "teacher.student.update",
+            targetType: "student",
+            targetId: studentId,
+            metadata: { fields: Object.keys(dataToUpdate) },
+            request,
+        });
+
         return apiSuccess({
             message: "Étudiant mis à jour",
             student: updatedStudent,
@@ -149,6 +160,23 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
                 teacherId: true,
                 firstName: true,
                 lastName: true,
+                progress: {
+                    select: { proof: true },
+                },
+                experiences: {
+                    select: {
+                        journal: {
+                            select: { proofs: true },
+                        },
+                    },
+                },
+                missions: {
+                    select: {
+                        journal: {
+                            select: { proofs: true },
+                        },
+                    },
+                },
             },
         });
 
@@ -160,13 +188,38 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
             return apiError("Non autorisé à supprimer cet étudiant", 403);
         }
 
+        const proofReferences = [
+            ...existingStudent.progress.map((progress) => progress.proof),
+            ...existingStudent.experiences.flatMap((experience) =>
+                experience.journal.flatMap((entry) => entry.proofs)
+            ),
+            ...existingStudent.missions.flatMap((mission) =>
+                mission.journal.flatMap((entry) => entry.proofs)
+            ),
+        ];
+        const blobCleanup = await deleteBlobReferences(proofReferences);
+
         await prisma.student.delete({
             where: { id: studentId },
+        });
+
+        await writeAuditLog({
+            actor: auth.payload,
+            action: "teacher.student.delete",
+            targetType: "student",
+            targetId: studentId,
+            metadata: {
+                firstName: existingStudent.firstName,
+                lastName: existingStudent.lastName,
+                blobCleanup,
+            },
+            request,
         });
 
         return apiSuccess({
             deleted: true,
             studentId,
+            blobCleanup,
             message: `Étudiant ${existingStudent.firstName} ${existingStudent.lastName} supprimé`,
         });
     } catch (error) {

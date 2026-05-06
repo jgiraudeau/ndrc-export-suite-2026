@@ -2,11 +2,22 @@ import { NextRequest } from "next/server";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 import { ALL_COMPETENCIES } from "@/data/competencies";
 import { genAI } from "@/lib/ai/gemini";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { checkAiQuota, logAiUsage } from "@/lib/ai-usage";
+import type { JWTPayload } from "@/lib/jwt";
 
 export async function POST(request: NextRequest) {
+    let actor: JWTPayload | null = null;
+    let promptChars = 0;
+    let responseChars = 0;
+
     try {
         const auth = await requireAuth(request, ["STUDENT", "TEACHER"]);
         if ("status" in auth) return auth;
+        actor = auth.payload;
+
+        const rateLimit = checkRateLimit(request, "ai:missions-generate", 30, 60 * 60 * 1000);
+        if (rateLimit) return rateLimit;
 
         const { competencyIds, context, level = 2 } = await request.json();
 
@@ -22,6 +33,9 @@ export async function POST(request: NextRequest) {
         if (compsToPractice.length === 0) {
             return apiError("Aucune compétence valide trouvée.");
         }
+
+        const quota = await checkAiQuota(request, auth.payload, "teacher.generate_mission");
+        if (quota) return quota;
 
         // Construct context-rich details
         const validComps = compsToPractice as NonNullable<typeof compsToPractice[0]>[];
@@ -67,6 +81,7 @@ L'e-mail doit globalement :
 
 Génère uniquement le contenu de cet email.
 `;
+        promptChars = prompt.length;
 
         // Le store RAG global est piloté par l'admin (pas d'embarquement local des PDFs).
         const ragStoreName = process.env.RAG_GLOBAL_STORE_NAME?.trim() || null;
@@ -93,11 +108,36 @@ Génère uniquement le contenu de cet email.
             contents: prompt,
             config,
         });
+        const mission = response.text ?? "";
+        responseChars = mission.length;
 
-        return apiSuccess({ mission: response.text });
+        await logAiUsage({
+            actor: auth.payload,
+            feature: "teacher.generate_mission",
+            model: "gemini-2.5-flash",
+            status: "success",
+            promptChars,
+            responseChars,
+            metadata: { competencyIds, level, rag: Boolean(ragStoreName) },
+            request,
+        });
+
+        return apiSuccess({ mission });
 
     } catch (error: unknown) {
         console.error("Gemini Generate Error:", error);
+        if (actor) {
+            await logAiUsage({
+                actor,
+                feature: "teacher.generate_mission",
+                model: "gemini-2.5-flash",
+                status: "error",
+                promptChars,
+                responseChars,
+                errorMessage: error instanceof Error ? error.message : "Erreur génération mission",
+                request,
+            });
+        }
         const message =
             error instanceof Error
                 ? error.message

@@ -43,8 +43,11 @@ export default function TeacherLoginPage() {
             return;
         }
 
-        // Stocker le token JWT dans localStorage
-        localStorage.setItem("ndrc_token", data.token);
+        if (!("name" in data)) {
+            setError("Réponse de connexion invalide");
+            return;
+        }
+
         localStorage.setItem("ndrc_user", JSON.stringify({ name: data.name, role: "TEACHER" }));
 
         router.push("/teacher");

@@ -16,13 +16,15 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { apiLogout } from "@/lib/api-client";
 
 export function TeacherSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleLogout = () => {
-    localStorage.removeItem("ndrc_token");
+  const handleLogout = async () => {
+    await apiLogout();
+    localStorage.removeItem("ndrc_user");
     router.push("/teacher/login");
   };
 

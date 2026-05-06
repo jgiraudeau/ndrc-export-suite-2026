@@ -131,9 +131,7 @@ export default function AdminRagPage() {
   const [showSyncErrors, setShowSyncErrors] = useState(false);
 
   const authHeaders = (): HeadersInit => {
-    if (typeof window === "undefined") return {};
-    const token = localStorage.getItem("ndrc_token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return {};
   };
 
   const fetchRagDocuments = useCallback(async () => {

@@ -27,7 +27,6 @@ export default function StudentLoginPage() {
             return;
         }
 
-        localStorage.setItem("ndrc_token", data.token);
         localStorage.setItem("ndrc_user", JSON.stringify({
             name: data.name,
             role: "STUDENT",

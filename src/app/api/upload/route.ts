@@ -1,11 +1,16 @@
 import { put } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-helpers';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function POST(request: NextRequest) {
     // Vérification de l'utilisateur (Étudiant autorisé à uploader)
     const auth = await requireAuth(request, ["STUDENT"]);
     if ("status" in auth) return auth;
+
+    const rateLimit = checkRateLimit(request, "upload:proof", 30, 60 * 60 * 1000);
+    if (rateLimit) return rateLimit;
 
     try {
         const formData = await request.formData();
@@ -40,6 +45,15 @@ export async function POST(request: NextRequest) {
 
         const blob = await put(`proofs/${cleanName}`, file, {
             access: 'public',
+        });
+
+        await writeAuditLog({
+            actor: auth.payload,
+            action: "student.proof.upload",
+            targetType: "blob",
+            targetId: blob.pathname,
+            metadata: { fileSize: file.size, fileType: file.type, extension: fileExtension },
+            request,
         });
 
         return NextResponse.json({ url: blob.url });

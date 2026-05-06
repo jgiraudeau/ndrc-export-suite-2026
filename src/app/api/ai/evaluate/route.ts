@@ -1,10 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/api-helpers";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { checkAiQuota, logAiUsage } from "@/lib/ai-usage";
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const rateLimit = checkRateLimit(req, "ai:evaluate", 20, 60 * 60 * 1000);
+  if (rateLimit) return rateLimit;
+
+  const auth = await requireAuth(req, ["TEACHER", "ADMIN"]);
+  if ("status" in auth) return auth;
+
   try {
     const { studentId, type } = await req.json();
 
@@ -18,6 +27,9 @@ export async function POST(req: Request) {
     });
 
     if (!student) return NextResponse.json({ error: "Étudiant introuvable" }, { status: 404 });
+    if (auth.payload.role === "TEACHER" && student.teacherId !== auth.payload.sub) {
+      return NextResponse.json({ error: "Étudiant introuvable" }, { status: 404 });
+    }
 
     // 2. Prepare Context (Journal & Missions)
     const context = student.experiences.map(e => `- MISSION: ${e.title}\n  Description: ${e.description}`).join("\n\n");
@@ -44,6 +56,9 @@ export async function POST(req: Request) {
       }
     `;
 
+    const quota = await checkAiQuota(req, auth.payload, "teacher.evaluate_student");
+    if (quota) return quota;
+
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -52,10 +67,29 @@ export async function POST(req: Request) {
     const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const data = JSON.parse(cleanJson);
 
+    await logAiUsage({
+      actor: auth.payload,
+      feature: "teacher.evaluate_student",
+      model: "gemini-1.5-flash",
+      status: "success",
+      promptChars: prompt.length,
+      responseChars: text.length,
+      metadata: { studentId, type },
+      request: req,
+    });
+
     return NextResponse.json(data);
 
   } catch (err) {
     console.error("AI Evaluation Error:", err);
+    await logAiUsage({
+      actor: auth.payload,
+      feature: "teacher.evaluate_student",
+      model: "gemini-1.5-flash",
+      status: "error",
+      errorMessage: err instanceof Error ? err.message : "Erreur evaluation IA",
+      request: req,
+    });
     return NextResponse.json({ error: "L'IA n'a pas pu traiter la demande." }, { status: 500 });
   }
 }

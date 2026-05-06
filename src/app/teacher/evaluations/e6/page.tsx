@@ -20,20 +20,17 @@ export default function EvaluationsE6Page() {
     
     if (!error && data) {
       setStudents(data);
+    } else if (error?.includes("authentifié") || error?.includes("Token")) {
+      router.push("/teacher/login");
     }
     setLoading(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
-    const token = localStorage.getItem("ndrc_token");
-    if (!token) {
-      router.push("/teacher/login");
-      return;
-    }
     queueMicrotask(() => {
       void fetchStudents();
     });
-  }, [fetchStudents, router]);
+  }, [fetchStudents]);
 
 
   const studentsWithE6Progress = students.map(s => {

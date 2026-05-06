@@ -6,19 +6,16 @@
 const getBaseUrl = () =>
     typeof window !== "undefined" ? "" : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-function getToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("ndrc_token");
-}
-
 export async function apiFetch<T>(
     path: string,
     options: RequestInit = {}
 ): Promise<{ data: T | null; error: string | null }> {
-    const token = getToken();
+    if (typeof window !== "undefined") {
+        localStorage.removeItem("ndrc_token");
+    }
+
     const headers: HeadersInit = {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
     };
 
@@ -40,28 +37,27 @@ export async function apiFetch<T>(
 // =============================================================
 
 export async function apiTeacherLogin(email: string, password: string) {
-    return apiFetch<{ token: string; name: string; role: string }>(
+    return apiFetch<{ name: string; role: string }>(
         "/api/auth/teacher/login",
         { method: "POST", body: JSON.stringify({ email, password }) }
     );
 }
 
 export async function apiTeacherRegister(name: string, email: string, password: string) {
-    return apiFetch<{ token: string; name: string; role: string }>(
+    return apiFetch<{ pending: boolean; message: string }>(
         "/api/auth/teacher/register",
         { method: "POST", body: JSON.stringify({ name, email, password }) }
     );
 }
 
 export async function apiStudentLogin(identifier: string, password: string) {
-    return apiFetch<{ token: string; name: string; role: string; classCode: string; studentId: string; wpUrl: string | null; prestaUrl: string | null }>(
+    return apiFetch<{ name: string; role: string; classCode: string; studentId: string; wpUrl: string | null; prestaUrl: string | null }>(
         "/api/auth/student/login",
         { method: "POST", body: JSON.stringify({ identifier, password }) }
     );
 }
 
 export async function apiLogout() {
-    localStorage.removeItem("ndrc_token");
     localStorage.removeItem("ndrc_user");
     return apiFetch<{ message: string }>("/api/auth/logout", { method: "POST" });
 }
@@ -123,10 +119,44 @@ export async function apiUpdateStudent(id: string, data: { wpUrl?: string; prest
 }
 
 export async function apiDeleteStudent(id: string) {
-    return apiFetch<{ deleted: boolean; studentId: string; message: string }>(
+    return apiFetch<{
+        deleted: boolean;
+        studentId: string;
+        message: string;
+        blobCleanup?: { requested: number; deleted: number; failed: number; errors: string[] };
+    }>(
         `/api/students/${id}`,
         { method: "DELETE" }
     );
+}
+
+export async function apiDownloadStudentExport(id: string): Promise<{ ok: boolean; error: string | null }> {
+    try {
+        const res = await fetch(`/api/students/${id}/export`, {
+            headers: { Accept: "application/json" },
+        });
+
+        if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as { error?: string };
+            return { ok: false, error: data.error || "Export impossible" };
+        }
+
+        const blob = await res.blob();
+        const disposition = res.headers.get("content-disposition") || "";
+        const match = disposition.match(/filename="([^"]+)"/);
+        const filename = match?.[1] || "export-rgpd-eleve.json";
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        return { ok: true, error: null };
+    } catch {
+        return { ok: false, error: "Erreur de connexion au serveur" };
+    }
 }
 
 export async function apiImportStudents(
@@ -294,7 +324,7 @@ export async function apiGetStudentEvaluations(studentId: string) {
 // =============================================================
 
 export async function apiAdminLogin(email: string, password: string) {
-    return apiFetch<{ token: string; name: string; role: string }>(
+    return apiFetch<{ name: string; role: string }>(
         "/api/auth/admin/login",
         { method: "POST", body: JSON.stringify({ email, password }) }
     );

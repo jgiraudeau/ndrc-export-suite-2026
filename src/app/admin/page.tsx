@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Shield, CheckCircle, XCircle, Trash2, Users, BookOpen, LogOut, Clock, BarChart3, Key, FileText, ClipboardList, Database, ExternalLink } from "lucide-react";
-import { apiGetTeachers, apiManageTeacher, apiGetAdminStats, type TeacherAdmin, type AdminStats } from "@/lib/api-client";
+import { Shield, CheckCircle, XCircle, Trash2, Users, BookOpen, LogOut, Clock, BarChart3, Key, FileText, ClipboardList, Database, ExternalLink, ScrollText, BrainCircuit } from "lucide-react";
+import { apiGetTeachers, apiManageTeacher, apiGetAdminStats, apiLogout, type TeacherAdmin, type AdminStats } from "@/lib/api-client";
 
 type StatusFilter = "all" | "pending" | "active" | "rejected";
 
@@ -68,8 +68,8 @@ export default function AdminDashboardPage() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("ndrc_token");
+    const handleLogout = async () => {
+        await apiLogout();
         localStorage.removeItem("ndrc_user");
         router.push("/admin/login");
     };
@@ -148,6 +148,20 @@ export default function AdminDashboardPage() {
                         >
                             <Database size={14} />
                             Base RAG
+                        </Link>
+                        <Link
+                            href="/admin/audit"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[11px] font-black uppercase tracking-wider hover:bg-slate-100"
+                        >
+                            <ScrollText size={14} />
+                            Audit
+                        </Link>
+                        <Link
+                            href="/admin/ai-usage"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[11px] font-black uppercase tracking-wider hover:bg-slate-100"
+                        >
+                            <BrainCircuit size={14} />
+                            Usage IA
                         </Link>
                     </div>
                 </div>

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "@/lib/ai/gemini";
 import { QUIZ_EXPORT_PROMPTS } from "@/lib/ai/prompts";
-import * as XLSX from "xlsx";
+import { requireAuth } from "@/lib/api-helpers";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { checkAiQuota, logAiUsage } from "@/lib/ai-usage";
 
 type QuizFormat = keyof typeof QUIZ_EXPORT_PROMPTS;
 
@@ -34,7 +36,21 @@ function isWooclapPayload(value: unknown): value is WooclapPayload {
     });
 }
 
+function csvCell(value: string | number): string {
+    const raw = String(value);
+    if (/[",\n\r;]/.test(raw)) {
+        return `"${raw.replace(/"/g, '""')}"`;
+    }
+    return raw;
+}
+
 export async function POST(req: NextRequest) {
+    const rateLimit = checkRateLimit(req, "ai:export-quiz", 20, 60 * 60 * 1000);
+    if (rateLimit) return rateLimit;
+
+    const auth = await requireAuth(req, ["TEACHER", "ADMIN"]);
+    if ("status" in auth) return auth;
+
     try {
         const body = (await req.json()) as { content?: unknown; format?: unknown };
         const content = typeof body.content === "string" ? body.content : "";
@@ -53,7 +69,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid format" }, { status: 400 });
         }
 
+        const quota = await checkAiQuota(req, auth.payload, "teacher.export_quiz");
+        if (quota) return quota;
+
         const transformed = await generateText(prompt, content);
+        let outputChars = transformed.length;
 
         if (formatKey === "wooclap") {
             try {
@@ -65,8 +85,8 @@ export async function POST(req: NextRequest) {
                     throw new Error("Invalid Wooclap payload structure");
                 }
                 
-                // Create Wooclap Excel format
-                const wsData: Array<Array<string | number>> = [
+                // Create Wooclap-compatible CSV format without the vulnerable xlsx dependency.
+                const rows: Array<Array<string | number>> = [
                     ["Question", "Type", "Proposition 1", "Proposition 2", "Proposition 3", "Proposition 4", "Correcte(s)"]
                 ];
 
@@ -82,19 +102,27 @@ export async function POST(req: NextRequest) {
                         ...paddedAnswers,
                         (q.correct || [0]).map((i) => i + 1).join(",")
                     ];
-                    wsData.push(row);
+                    rows.push(row);
                 });
 
-                const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.aoa_to_sheet(wsData);
-                XLSX.utils.book_append_sheet(wb, ws, "Quiz");
-                
-                const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+                const csv = rows.map((row) => row.map(csvCell).join(";")).join("\n");
+                outputChars = csv.length;
 
-                return new NextResponse(buffer, {
+                await logAiUsage({
+                    actor: auth.payload,
+                    feature: "teacher.export_quiz",
+                    model: "gemini-2.5-flash-lite",
+                    status: "success",
+                    promptChars: prompt.length + content.length,
+                    responseChars: outputChars,
+                    metadata: { format: formatKey, questions: parsed.questions.length },
+                    request: req,
+                });
+
+                return new NextResponse(csv, {
                     headers: {
-                        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        "Content-Disposition": 'attachment; filename="quiz_wooclap.xlsx"',
+                        "Content-Type": "text/csv; charset=utf-8",
+                        "Content-Disposition": 'attachment; filename="quiz_wooclap.csv"',
                     },
                 });
             } catch (e) {
@@ -107,6 +135,17 @@ export async function POST(req: NextRequest) {
         const contentType = formatKey === "google" ? "text/csv" : "text/plain";
         const extension = formatKey === "google" ? "csv" : "txt";
 
+        await logAiUsage({
+            actor: auth.payload,
+            feature: "teacher.export_quiz",
+            model: "gemini-2.5-flash-lite",
+            status: "success",
+            promptChars: prompt.length + content.length,
+            responseChars: outputChars,
+            metadata: { format: formatKey },
+            request: req,
+        });
+
         return new NextResponse(transformed, {
             headers: {
                 "Content-Type": contentType,
@@ -116,6 +155,14 @@ export async function POST(req: NextRequest) {
 
     } catch (error: unknown) {
         console.error("Quiz export error:", error);
+        await logAiUsage({
+            actor: auth.payload,
+            feature: "teacher.export_quiz",
+            model: "gemini-2.5-flash-lite",
+            status: "error",
+            errorMessage: error instanceof Error ? error.message : "Quiz export failed",
+            request: req,
+        });
         const message = error instanceof Error ? error.message : "Quiz export failed";
         return NextResponse.json({ error: message }, { status: 500 });
     }

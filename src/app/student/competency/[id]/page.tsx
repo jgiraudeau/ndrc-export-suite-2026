@@ -39,9 +39,6 @@ export default function CompetencyProofPage() {
 
     // Charger la progression existante depuis l'API
     useEffect(() => {
-        const token = localStorage.getItem("ndrc_token");
-        if (!token) { router.push("/student/login"); return; }
-
         apiGetProgress().then(({ data }) => {
             if (data && competencyId) {
                 const record = data.find((p: ProgressRecord) => p.competencyId === competencyId);
@@ -125,12 +122,9 @@ export default function CompetencyProofPage() {
         const formData = new FormData();
         formData.append("file", file);
 
-        const token = localStorage.getItem("ndrc_token");
-
         try {
             const res = await fetch("/api/upload", {
                 method: "POST",
-                headers: { "Authorization": `Bearer ${token}` },
                 body: formData,
             });
 

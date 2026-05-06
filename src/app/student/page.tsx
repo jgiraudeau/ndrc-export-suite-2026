@@ -10,7 +10,7 @@ import { ExportUtils } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
 import { calculateBadge } from "@/lib/exports/badges";
 import { PDFExportService } from "@/lib/exports/student-export";
-import { apiStudentDashboard, apiChangePassword, apiGetExperiences, apiGetJournal, type StudentDashboardData } from "@/lib/api-client";
+import { apiStudentDashboard, apiChangePassword, apiGetExperiences, apiGetJournal, apiLogout, type StudentDashboardData } from "@/lib/api-client";
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -35,16 +35,13 @@ export default function StudentDashboard() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("ndrc_token");
-    if (!token) { router.push("/student/login"); return; }
-
     // Fetch Dashboard Data
     apiStudentDashboard().then(({ data, error }) => {
       setLoading(false);
       if (error) {
         console.error("Dashboard error:", error);
         if (error.includes("authentifié") || error.includes("invalide") || error.includes("interfait")) {
-          localStorage.removeItem("ndrc_token");
+          localStorage.removeItem("ndrc_user");
           router.push("/student/login");
         } else {
           setErrorMsg(error);
@@ -55,21 +52,15 @@ export default function StudentDashboard() {
     });
 
     // Fetch Notifications
-    fetch("/api/notifications", {
-      headers: { "Authorization": `Bearer ${token}` }
-    }).then(res => res.json()).then(json => {
+    fetch("/api/notifications").then(res => res.json()).then(json => {
       if (json.success) setNotifications(json.data);
     });
   }, [router]);
 
   const markAsRead = async (id?: string) => {
-    const token = localStorage.getItem("ndrc_token");
     await fetch("/api/notifications", {
       method: "PATCH",
-      headers: { 
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(id ? { id } : { all: true })
     });
     // Refresh local state
@@ -80,8 +71,8 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("ndrc_token");
+  const handleLogout = async () => {
+    await apiLogout();
     localStorage.removeItem("ndrc_user");
     router.push("/");
   };
@@ -120,7 +111,7 @@ export default function StudentDashboard() {
       <h1 className="text-xl font-bold text-slate-800 mb-2">Oups, une erreur 😕</h1>
       <p className="text-red-500 font-medium mb-6">{errorMsg}</p>
       <button
-        onClick={() => { localStorage.removeItem("ndrc_token"); router.push("/student/login"); }}
+        onClick={() => { localStorage.removeItem("ndrc_user"); router.push("/student/login"); }}
         className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition"
       >
         Retour à la connexion

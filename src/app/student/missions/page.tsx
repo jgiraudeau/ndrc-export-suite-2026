@@ -49,9 +49,6 @@ export default function MissionsPage() {
     const [justSaved, setJustSaved] = useState(false);
 
     useEffect(() => {
-        const token = localStorage.getItem("ndrc_token");
-        if (!token) { router.push("/student/login"); return; }
-
         Promise.all([
             apiGetProgress(),
             apiGetMyMissions(),
@@ -88,10 +85,9 @@ export default function MissionsPage() {
         if (selectedIds.length === 0) { setErrorMsg("Sélectionne au moins une compétence pour ta mission."); return; }
         setGenerating(true); setErrorMsg(""); setMissionMarkdown(null);
         try {
-            const token = localStorage.getItem("ndrc_token");
             const res = await fetch("/api/missions/generate", {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ competencyIds: selectedIds, context: selectedContext, level: selectedLevel }),
             });
             const data = await res.json();

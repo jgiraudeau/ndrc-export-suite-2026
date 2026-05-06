@@ -174,13 +174,9 @@ export default function TeacherMissionGeneratePage() {
     setJustSaved(false);
 
     try {
-      const token = localStorage.getItem("ndrc_token");
       const res = await fetch("/api/missions/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           competencyIds: selectedIds,
           context: selectedContext,
@@ -215,7 +211,6 @@ export default function TeacherMissionGeneratePage() {
     setErrorMsg("");
 
     try {
-      const token = localStorage.getItem("ndrc_token");
       const fallbackTitle = `Épreuve E5B ${selectedPlatform} Niv.${selectedLevel} — ${new Date().toLocaleDateString(
         "fr-FR"
       )}`;
@@ -223,10 +218,7 @@ export default function TeacherMissionGeneratePage() {
 
       const res = await fetch("/api/missions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
           content: generatedMission.text,

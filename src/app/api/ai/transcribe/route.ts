@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
 import { transcribeAudio } from "@/lib/ai/gemini";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { checkAiQuota, logAiUsage } from "@/lib/ai-usage";
 import OpenAI from "openai";
 
 export const maxDuration = 60;
@@ -40,6 +42,9 @@ function readTranscriptionText(result: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
+  const rateLimit = checkRateLimit(req, "ai:transcribe", 20, 60 * 60 * 1000);
+  if (rateLimit) return rateLimit;
+
   // Seuls les professeurs et les administrateurs peuvent utiliser la transcription (coût)
   // On récupère auth pour logger si besoin mais on ne l'utilise pas forcément pour porter l'ID
   const auth = await requireAuth(req, ["TEACHER", "ADMIN"]);
@@ -83,11 +88,23 @@ export async function POST(req: NextRequest) {
       return apiError(`Format audio non supporté: ${mimeType}`, 415);
     }
     if (file.size <= 4096) {
+      await logAiUsage({
+        actor: auth.payload,
+        feature: "teacher.transcribe_audio",
+        status: "skipped",
+        responseChars: "[SILENCE]".length,
+        metadata: { reason: "small_audio", fileSize: file.size, mimeType },
+        request: req,
+      });
       return apiSuccess({ text: "[SILENCE]" });
     }
 
+    const quota = await checkAiQuota(req, auth.payload, "teacher.transcribe_audio");
+    if (quota) return quota;
+
     let text = "";
     let bestEffort = "";
+    let modelUsed = "gemini-2.5-flash";
     const openaiKey = process.env.OPENAI_API_KEY;
     if (openaiKey) {
       try {
@@ -107,6 +124,7 @@ export async function POST(req: NextRequest) {
           bestEffort = candidate;
           if (!isGenericHallucinationLike(candidate)) {
             text = candidate;
+            modelUsed = "gpt-4o-mini-transcribe";
           }
         }
       } catch (openaiError: any) {
@@ -147,9 +165,28 @@ export async function POST(req: NextRequest) {
         textHead: text.slice(0, 50)
     });
 
+    await logAiUsage({
+      actor: auth.payload,
+      feature: "teacher.transcribe_audio",
+      model: modelUsed,
+      status: "success",
+      promptChars: base64Audio.length,
+      responseChars: text.length,
+      metadata: { fileSize: file.size, mimeType, usedBestEffort: Boolean(bestEffort && text === bestEffort) },
+      request: req,
+    });
+
     return apiSuccess({ text: text });
   } catch (error: any) {
     console.error("Erreur serveur transcription Gemini (V3):", error);
+    await logAiUsage({
+      actor: auth.payload,
+      feature: "teacher.transcribe_audio",
+      model: "transcribe",
+      status: "error",
+      errorMessage: error instanceof Error ? error.message : "Erreur transcription",
+      request: req,
+    });
     
     // On renvoie un message très parlant pour aider le débogage UI
     const detailedMessage = error.message || "Erreur inconnue";

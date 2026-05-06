@@ -51,16 +51,15 @@ export default function TeacherDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem("ndrc_token");
-        if (!token) {
+        const [stdRes, statsRes] = await Promise.all([
+          fetch("/api/teacher/students"),
+          fetch("/api/teacher/dashboard")
+        ]);
+
+        if (stdRes.status === 401 || statsRes.status === 401) {
           router.push("/teacher/login");
           return;
         }
-
-        const [stdRes, statsRes] = await Promise.all([
-          fetch("/api/teacher/students", { headers: { Authorization: `Bearer ${token}` } }),
-          fetch("/api/teacher/dashboard", { headers: { Authorization: `Bearer ${token}` } })
-        ]);
 
         const stdData = (await stdRes.json()) as {
           success?: boolean;

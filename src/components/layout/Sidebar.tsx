@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { apiLogout } from "@/lib/api-client";
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Tableau de Bord", href: "/teacher" },
@@ -32,8 +33,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem("ndrc_token");
+  const handleLogout = async () => {
+    await apiLogout();
     localStorage.removeItem("ndrc_user");
     window.location.href = "/";
   };

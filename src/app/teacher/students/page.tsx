@@ -20,7 +20,7 @@ import {
     FileSpreadsheet
 } from "lucide-react";
 import {
-    apiGetStudents, apiImportStudents, apiAddComment, apiDeleteComment, apiUpdateStudent, apiDeleteStudent,
+    apiGetStudents, apiImportStudents, apiAddComment, apiDeleteComment, apiUpdateStudent, apiDeleteStudent, apiDownloadStudentExport,
     type StudentWithProgress
 } from "@/lib/api-client";
 import { ALL_COMPETENCIES, E4_COMPETENCIES, E6_COMPETENCIES, WORDPRESS_COMPETENCIES, PRESTASHOP_COMPETENCIES } from "@/data/competencies";
@@ -173,22 +173,6 @@ function parseCSV(text: string): ImportStudentRow[] {
     return parseTabularRows(rows);
 }
 
-async function parseExcel(file: File): Promise<ImportStudentRow[]> {
-    const XLSX = await import("xlsx");
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const firstSheetName = workbook.SheetNames[0];
-    if (!firstSheetName) return [];
-
-    const sheet = workbook.Sheets[firstSheetName];
-    const rawRows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(sheet, {
-        header: 1,
-        defval: "",
-    });
-    const rows = rawRows.map((row) => row.map((cell) => String(cell ?? "").trim()));
-    return parseTabularRows(rows);
-}
-
 export default function TeacherDashboard() {
     const [students, setStudents] = useState<StudentWithProgress[]>([]);
     const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -200,6 +184,7 @@ export default function TeacherDashboard() {
     const [wpInputs, setWpInputs] = useState<Record<string, string>>({});
     const [prestaInputs, setPrestaInputs] = useState<Record<string, string>>({});
     const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
+    const [exportingStudentId, setExportingStudentId] = useState<string | null>(null);
 
     const router = useRouter();
 
@@ -236,7 +221,20 @@ export default function TeacherDashboard() {
 
         setStudents((prev) => prev.filter((s) => s.id !== studentId));
         setExpandedStudentId((prev) => (prev === studentId ? null : prev));
-        setImportStatus({ type: "success", message: data.message || "Étudiant supprimé." });
+        const cleanupMessage = data.blobCleanup?.failed
+            ? ` ${data.blobCleanup.failed} preuve(s) Blob n'ont pas pu être supprimées automatiquement.`
+            : "";
+        setImportStatus({ type: "success", message: `${data.message || "Étudiant supprimé."}${cleanupMessage}` });
+    };
+
+    const handleExportStudent = async (studentId: string) => {
+        setExportingStudentId(studentId);
+        const result = await apiDownloadStudentExport(studentId);
+        setExportingStudentId(null);
+
+        if (!result.ok) {
+            setImportStatus({ type: "error", message: result.error || "Export impossible." });
+        }
     };
 
     const fetchStudents = useCallback(async () => {
@@ -250,9 +248,6 @@ export default function TeacherDashboard() {
     }, []);
 
     useEffect(() => {
-        const token = localStorage.getItem("ndrc_token");
-        if (!token) { router.push("/teacher/login"); return; }
-        
         let cancelled = false;
         const loadInitialStudents = async () => {
             const { data, error } = await apiGetStudents();
@@ -261,6 +256,10 @@ export default function TeacherDashboard() {
             if (!error && data) {
                 setStudents(data);
             } else if (error) {
+                if (error.includes("authentifié") || error.includes("Token")) {
+                    router.push("/teacher/login");
+                    return;
+                }
                 setImportStatus({ type: "error", message: error });
             }
         };
@@ -289,20 +288,14 @@ export default function TeacherDashboard() {
     const processFile = async (file: File) => {
         const lowerName = file.name.toLowerCase();
         const isCsv = lowerName.endsWith(".csv");
-        const isExcel = lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls");
 
-        if (!isCsv && !isExcel) {
-            setImportStatus({ type: "error", message: "Fichier invalide. Déposez un .csv, .xlsx ou .xls" });
+        if (!isCsv) {
+            setImportStatus({ type: "error", message: "Fichier invalide. Déposez un .csv" });
             return;
         }
 
-        let parsed: ImportStudentRow[] = [];
-        if (isCsv) {
-            const text = await file.text();
-            parsed = parseCSV(text);
-        } else {
-            parsed = await parseExcel(file);
-        }
+        const text = await file.text();
+        const parsed = parseCSV(text);
 
         if (parsed.length === 0) {
             setImportStatus({ type: "error", message: "Aucun étudiant trouvé dans le fichier." });
@@ -424,12 +417,12 @@ export default function TeacherDashboard() {
                             >
                                 <Upload size={36} className={dragging ? "text-purple-500" : "text-slate-300"} />
                                 <div>
-                                    <p className="font-bold text-slate-700">{dragging ? "Déposez ici !" : "Glissez votre listing CSV/Excel"}</p>
-                                    <p className="text-slate-400 text-sm mt-1">ou <span className="text-purple-600 font-semibold underline">cliquez pour parcourir</span> (.csv, .xlsx)</p>
+                                    <p className="font-bold text-slate-700">{dragging ? "Déposez ici !" : "Glissez votre listing CSV"}</p>
+                                    <p className="text-slate-400 text-sm mt-1">ou <span className="text-purple-600 font-semibold underline">cliquez pour parcourir</span> (.csv)</p>
                                 </div>
                             </div>
                         </label>
-                        <input id="csv-input" type="file" accept=".csv,.xlsx,.xls" onChange={handleFileInput} className="hidden" />
+                        <input id="csv-input" type="file" accept=".csv" onChange={handleFileInput} className="hidden" />
                         {importStatus && (
                             <div className={`mt-3 px-4 py-3 rounded-xl flex items-center gap-3 font-medium text-sm ${importStatus.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
                                 {importStatus.type === "success" ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
@@ -511,6 +504,18 @@ export default function TeacherDashboard() {
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
+                                                void handleExportStudent(student.id);
+                                            }}
+                                            disabled={exportingStudentId === student.id}
+                                            title="Exporter les données RGPD"
+                                            aria-label={`Exporter les données de ${student.firstName} ${student.lastName}`}
+                                            className="flex-shrink-0 p-2 rounded-xl bg-slate-50 text-slate-600 border border-slate-100 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                                        >
+                                            <Download size={16} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 void handleDeleteStudent(student.id);
                                             }}
                                             disabled={deletingStudentId === student.id}
@@ -558,6 +563,14 @@ export default function TeacherDashboard() {
                                                     </div>
                                                 </div>
                                                 <div className="mt-3 flex justify-end">
+                                                    <button
+                                                        onClick={() => handleExportStudent(student.id)}
+                                                        disabled={exportingStudentId === student.id}
+                                                        className="mr-2 bg-slate-100 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                                    >
+                                                        <Download size={16} />
+                                                        {exportingStudentId === student.id ? "Export..." : "Exporter RGPD"}
+                                                    </button>
                                                     <button
                                                         onClick={() => handleDeleteStudent(student.id)}
                                                         disabled={deletingStudentId === student.id}

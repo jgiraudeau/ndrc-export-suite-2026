@@ -6,6 +6,7 @@ import {
   listGlobalStoreDocuments,
   uploadAdminFileToGlobalStore,
 } from "@/lib/ai/file-search";
+import { writeAuditLog } from "@/lib/audit-log";
 
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB (Google File Search limit)
 
@@ -45,6 +46,14 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await uploadAdminFileToGlobalStore(rawFile);
+    await writeAuditLog({
+      actor: auth.payload,
+      action: "admin.rag.document.upload",
+      targetType: "rag_document",
+      targetId: result.documentName ?? undefined,
+      metadata: { fileName: rawFile.name, fileSize: rawFile.size, fileType: rawFile.type },
+      request,
+    });
     return apiSuccess(result, 201);
   } catch (err) {
     console.error("[rag/documents][POST]", err);
@@ -69,6 +78,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteStoreDocument(documentName);
+    await writeAuditLog({
+      actor: auth.payload,
+      action: "admin.rag.document.delete",
+      targetType: "rag_document",
+      targetId: documentName,
+      request,
+    });
     return apiSuccess({ deleted: true });
   } catch (err) {
     console.error("[rag/documents][DELETE]", err);

@@ -60,10 +60,7 @@ export default function TeacherMissionDetailPage() {
     useEffect(() => {
         async function fetchMission() {
             try {
-                const token = localStorage.getItem("ndrc_token");
-                const res = await fetch(`/api/teacher/missions/${id}`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
+                const res = await fetch(`/api/teacher/missions/${id}`);
                 const data = await res.json();
                 if (data.success) {
                     setMission(data.data);
@@ -81,15 +78,11 @@ export default function TeacherMissionDetailPage() {
     async function updateJournalEntry(entryId: string, isValidated: boolean) {
         setIsSaving(true);
         try {
-            const token = localStorage.getItem("ndrc_token");
             const comment = feedback[entryId] || "";
             
             const res = await fetch("/api/journal", {
                 method: "PATCH",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: entryId, teacherComment: comment, isValidated })
             });
 

@@ -46,10 +46,7 @@ export default function TeacherDashboard() {
 
   async function fetchDashboardData() {
     try {
-      const token = localStorage.getItem("ndrc_token");
-      const res = await fetch("/api/teacher/dashboard", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const res = await fetch("/api/teacher/dashboard");
       const data = await res.json();
       if (data.success) {
         setStats(data.data);

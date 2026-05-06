@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken, extractToken } from "@/lib/jwt";
+import { requireAuth } from "@/lib/api-helpers";
+import { writeAuditLog } from "@/lib/audit-log";
 import {
     buildEvaluationType,
     evaluationKindLabel,
@@ -9,15 +10,10 @@ import {
 } from "@/lib/evaluation-types";
 
 export async function POST(req: NextRequest) {
-    try {
-        const token = extractToken(req);
-        if (!token) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-        
-        const payload = await verifyToken(token);
-        if (!payload || (payload.role !== "TEACHER" && payload.role !== "ADMIN")) {
-            return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-        }
+    const auth = await requireAuth(req, ["TEACHER", "ADMIN"]);
+    if ("status" in auth) return auth;
 
+    try {
         const { studentId, type, isValidated, evaluationKind } = await req.json();
 
         if (!studentId || !type) {
@@ -34,6 +30,17 @@ export async function POST(req: NextRequest) {
         );
         const evaluationType = buildEvaluationType(normalizedType, normalizedKind);
 
+        const student = await prisma.student.findUnique({
+            where: { id: studentId },
+            select: { id: true, teacherId: true },
+        });
+        if (!student) {
+            return NextResponse.json({ error: "Étudiant introuvable" }, { status: 404 });
+        }
+        if (auth.payload.role === "TEACHER" && student.teacherId !== auth.payload.sub) {
+            return NextResponse.json({ error: "Étudiant introuvable" }, { status: 404 });
+        }
+
         const evaluation = await prisma.evaluation.findFirst({
             where: {
                 studentId,
@@ -44,6 +51,8 @@ export async function POST(req: NextRequest) {
             }
         });
 
+        let evaluationId = evaluation?.id;
+
         if (evaluation) {
             await prisma.evaluation.update({
                 where: { id: evaluation.id },
@@ -52,15 +61,15 @@ export async function POST(req: NextRequest) {
                     situation: `Évaluation ${normalizedType} — ${evaluationKindLabel(normalizedKind)}`,
                     isValidated,
                     validatedAt: isValidated ? new Date() : null,
-                    evaluatorId: payload.sub
+                    evaluatorId: auth.payload.sub
                 }
             });
         } else {
             // Si elle n'existe pas encore (curieux mais possible), on la crée
-            await prisma.evaluation.create({
+            const createdEvaluation = await prisma.evaluation.create({
                 data: {
                     studentId,
-                    evaluatorId: payload.sub,
+                    evaluatorId: auth.payload.sub,
                     type: evaluationType,
                     situation: `Évaluation ${normalizedType} — ${evaluationKindLabel(normalizedKind)}`,
                     date: new Date(),
@@ -68,7 +77,21 @@ export async function POST(req: NextRequest) {
                     validatedAt: isValidated ? new Date() : null,
                 }
             });
+            evaluationId = createdEvaluation.id;
         }
+
+        await writeAuditLog({
+            actor: auth.payload,
+            action: isValidated ? "teacher.evaluation.validate" : "teacher.evaluation.unvalidate",
+            targetType: "evaluation",
+            targetId: evaluationId,
+            metadata: {
+                studentId,
+                type: normalizedType,
+                evaluationKind: normalizedKind,
+            },
+            request: req,
+        });
 
         return NextResponse.json({ success: true, isValidated, evaluationKind: normalizedKind });
     } catch (error) {

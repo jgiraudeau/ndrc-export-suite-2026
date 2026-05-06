@@ -33,10 +33,7 @@ export default function WordPressSkills() {
       setWpUrl(user.wpUrl || null);
     }
 
-    const token = localStorage.getItem("ndrc_token");
-    if (!token) { setLoading(false); return; }
-
-    fetch("/api/progress", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("/api/progress")
       .then((r) => r.json())
       .then((data: { competencyId: string; acquired: boolean }[]) => {
         setAcquired(new Set(data.filter((p) => p.acquired).map((p) => p.competencyId)));
@@ -46,8 +43,7 @@ export default function WordPressSkills() {
   }, []);
 
   const toggleSkill = useCallback(async (skillId: string) => {
-    const token = localStorage.getItem("ndrc_token");
-    if (!token || saving) return;
+    if (saving) return;
 
     const next = !acquired.has(skillId);
     setSaving(skillId);
@@ -64,7 +60,7 @@ export default function WordPressSkills() {
     try {
       await fetch("/api/progress", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ competencyId: skillId, acquired: next, status: "SELF_DECLARED" }),
       });
     } catch {

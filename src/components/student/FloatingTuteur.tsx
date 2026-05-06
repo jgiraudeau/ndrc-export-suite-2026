@@ -163,9 +163,6 @@ export function FloatingTuteur() {
     async (text: string) => {
       if (!text.trim() || isStreaming) return;
 
-      const token = localStorage.getItem("ndrc_token");
-      if (!token) return;
-
       const userMessage = text.trim();
       setInput("");
       setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
@@ -181,7 +178,6 @@ export function FloatingTuteur() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ message: enrichedMessage, sessionId }),
         });

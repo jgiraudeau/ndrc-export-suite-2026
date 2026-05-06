@@ -121,7 +121,7 @@ export default function TeacherGenerate() {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `quiz_${format}_${topic.replace(/\s+/g, "_")}.${format === "wooclap" ? "xlsx" : format === "google" ? "csv" : "txt"}`;
+                a.download = `quiz_${format}_${topic.replace(/\s+/g, "_")}.${format === "wooclap" || format === "google" ? "csv" : "txt"}`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();

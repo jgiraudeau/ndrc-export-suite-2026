@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
+import { writeAuditLog } from "@/lib/audit-log";
 import bcrypt from "bcryptjs";
 
 // GET /api/students
@@ -205,6 +206,19 @@ export async function POST(request: NextRequest) {
                 createdStudents.push({ firstName: s.firstName, lastName: s.lastName, identifier });
             }
         }
+
+        await writeAuditLog({
+            actor: auth.payload,
+            action: "teacher.students.import",
+            targetType: "teacher",
+            targetId: auth.payload.sub,
+            metadata: {
+                requested: students.length,
+                created: createdCount,
+                updated: updatedCount,
+            },
+            request,
+        });
 
         return apiSuccess({
             message: "Import terminé avec succès",

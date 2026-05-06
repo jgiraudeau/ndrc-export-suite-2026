@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LayoutDashboard, Target, Globe, ShoppingBag, LogOut, Briefcase, BookOpen, GraduationCap, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FloatingTuteur } from "@/components/student/FloatingTuteur";
+import { apiLogout } from "@/lib/api-client";
 
 const NAV_ITEMS = [
     { href: "/student", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
@@ -22,8 +23,8 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     const router = useRouter();
     const pathname = usePathname();
 
-    const handleLogout = () => {
-        localStorage.removeItem("ndrc_token");
+    const handleLogout = async () => {
+        await apiLogout();
         localStorage.removeItem("ndrc_user");
         router.push("/");
     };

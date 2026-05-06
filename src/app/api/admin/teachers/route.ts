@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api-helpers";
+import { writeAuditLog } from "@/lib/audit-log";
 
 // GET /api/admin/teachers - Liste tous les profs
 export async function GET(request: NextRequest) {
@@ -58,6 +59,14 @@ export async function PATCH(request: NextRequest) {
 
         if (action === "delete") {
             await prisma.teacher.delete({ where: { id: teacherId } });
+            await writeAuditLog({
+                actor: auth.payload,
+                action: "admin.teacher.delete",
+                targetType: "teacher",
+                targetId: teacherId,
+                metadata: { email: teacher.email, name: teacher.name, previousStatus: teacher.status },
+                request,
+            });
             return apiSuccess({ message: "Formateur supprimé" });
         }
 
@@ -71,6 +80,15 @@ export async function PATCH(request: NextRequest) {
                 data: { passwordHash }
             });
 
+            await writeAuditLog({
+                actor: auth.payload,
+                action: "admin.teacher.reset_password",
+                targetType: "teacher",
+                targetId: teacherId,
+                metadata: { email: teacher.email, name: teacher.name },
+                request,
+            });
+
             return apiSuccess({ 
                 message: "Mot de passe réinitialisé", 
                 tempPassword 
@@ -81,6 +99,20 @@ export async function PATCH(request: NextRequest) {
         await prisma.teacher.update({
             where: { id: teacherId },
             data: { status: newStatus },
+        });
+
+        await writeAuditLog({
+            actor: auth.payload,
+            action: action === "approve" ? "admin.teacher.approve" : "admin.teacher.reject",
+            targetType: "teacher",
+            targetId: teacherId,
+            metadata: {
+                email: teacher.email,
+                name: teacher.name,
+                previousStatus: teacher.status,
+                newStatus,
+            },
+            request,
         });
 
         return apiSuccess({ message: `Formateur ${action === "approve" ? "validé" : "rejeté"}` });

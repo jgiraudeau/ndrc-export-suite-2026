@@ -6,7 +6,9 @@ import {
   ensureGlobalFileSearchStore,
 } from '@/lib/ai/file-search';
 import { prisma } from '@/lib/prisma';
-import { verifyToken, extractToken } from '@/lib/jwt';
+import { verifyToken, extractToken, type JWTPayload } from '@/lib/jwt';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { checkAiQuota, logAiUsage } from '@/lib/ai-usage';
 
 const GenerateSchema = z.object({
   topic: z.string().min(3, 'Le sujet est requis'),
@@ -22,6 +24,13 @@ const GenerateSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const rateLimit = checkRateLimit(req, 'ai:generate-course', 30, 60 * 60 * 1000);
+  if (rateLimit) return rateLimit;
+
+  let actor: JWTPayload | null = null;
+  let promptChars = 0;
+  let responseChars = 0;
+
   try {
     // 1. Vérification de l'authentification
     const token = extractToken(req);
@@ -32,6 +41,7 @@ export async function POST(req: NextRequest) {
     if (!payload || (payload.role !== 'TEACHER' && payload.role !== 'ADMIN')) {
       return NextResponse.json({ error: 'Accès réservé aux formateurs' }, { status: 403 });
     }
+    actor = payload;
     const teacherId = payload.sub;
 
     // 2. Validation des données
@@ -49,6 +59,10 @@ export async function POST(req: NextRequest) {
     
     // Ajout de la consigne d'extraction de nom de fichier (comme dans profvirtuel)
     userMessage += `\n\nIMPORTANT : La première ligne de ta réponse doit être un commentaire HTML caché contenant un nom de fichier court et simplifié (max 30 chars, pas d'espace, pas d'accents, use des underscores). Format : \`<!-- FILENAME: Nom_Fichier -->\`.`;
+    promptChars = systemPrompt.length + userMessage.length;
+
+    const quota = await checkAiQuota(req, payload, 'teacher.generate_course');
+    if (quota) return quota;
 
     // 4. Préparer le store RAG global (piloté par l'admin)
     let ragStoreName: string | null = null;
@@ -62,6 +76,7 @@ export async function POST(req: NextRequest) {
     const rawContent = await generateText(systemPrompt, userMessage, {
       fileSearchStoreNames: ragStoreName ? [ragStoreName] : undefined,
     });
+    responseChars = rawContent.length;
 
     // 6. Extraction du nom de fichier et nettoyage
     let content = rawContent;
@@ -83,6 +98,17 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    await logAiUsage({
+      actor: payload,
+      feature: 'teacher.generate_course',
+      model: 'gemini-2.5-flash-lite',
+      status: 'success',
+      promptChars,
+      responseChars,
+      metadata: { documentType, track, rag: Boolean(ragStoreName), savedDocumentId: savedDoc.id },
+      request: req,
+    });
+
     return NextResponse.json({
       id: savedDoc.id,
       content,
@@ -95,6 +121,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.issues }, { status: 400 });
     }
     console.error('Erreur génération IA:', error);
+    if (actor) {
+      await logAiUsage({
+        actor,
+        feature: 'teacher.generate_course',
+        model: 'gemini-2.5-flash-lite',
+        status: 'error',
+        promptChars,
+        responseChars,
+        errorMessage: error instanceof Error ? error.message : 'Erreur génération IA',
+        request: req,
+      });
+    }
     return NextResponse.json(
       { error: 'Erreur lors de la génération. Réessayez.' },
       { status: 500 }

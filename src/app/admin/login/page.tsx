@@ -27,7 +27,6 @@ export default function AdminLoginPage() {
             return;
         }
 
-        localStorage.setItem("ndrc_token", data.token);
         localStorage.setItem("ndrc_user", JSON.stringify({ name: data.name, role: "ADMIN" }));
 
         router.push("/admin");

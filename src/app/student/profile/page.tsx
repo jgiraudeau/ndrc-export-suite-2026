@@ -26,11 +26,8 @@ export default function StudentProfilePage() {
 
     async function fetchProfile() {
         try {
-            const token = localStorage.getItem("ndrc_token");
             // Reuse dashboard API for now to get stats, but we might want a specific profile API
-            const res = await fetch("/api/student/dashboard", {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
+            const res = await fetch("/api/student/dashboard");
             const json = await res.json() as { success: boolean; data?: StudentDashboardData };
             if (json.success) {
                 setData(json.data ?? null);

@@ -4,6 +4,8 @@ import { generateTextStream } from '@/lib/ai/gemini';
 import { ensureGlobalFileSearchStore } from '@/lib/ai/file-search';
 import { prisma } from '@/lib/prisma';
 import { verifyToken, extractToken } from '@/lib/jwt';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { checkAiQuota, logAiUsage } from '@/lib/ai-usage';
 
 const SYSTEM_TUTOR = `Tu es un tuteur pédagogique expert du BTS NDRC (Négociation et Digitalisation de la Relation Client).
 Tu aides les étudiants à comprendre leur cours, préparer leurs examens (E4, E5, E6) et maîtriser les outils numériques (WordPress, PrestaShop, CRM).
@@ -79,6 +81,9 @@ const ChatSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const rateLimit = checkRateLimit(req, 'ai:chat', 40, 60 * 60 * 1000);
+  if (rateLimit) return rateLimit;
+
   const encoder = new TextEncoder();
 
   // Auth
@@ -100,6 +105,8 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: 'Données invalides' }), { status: 400 });
   }
   const { message, sessionId: providedSessionId } = body;
+  const quota = await checkAiQuota(req, payload, 'student.chat');
+  if (quota) return quota;
 
   // 1. Session
   let session;
@@ -200,9 +207,35 @@ export async function POST(req: NextRequest) {
           data: { sessionId: session!.id, role: 'model', content: fullContent },
         });
 
+        await logAiUsage({
+          actor: payload,
+          feature: 'student.chat',
+          model: 'gemini-2.5-flash-lite',
+          status: 'success',
+          promptChars: message.length + chatHistory.reduce((sum, item) => sum + item.content.length, 0),
+          responseChars: fullContent.length,
+          metadata: {
+            sessionId: session!.id,
+            rag: Boolean(ragStoreName),
+            e5bFocused: isE5BFocusedQuestion,
+          },
+          request: req,
+        });
+
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (err) {
         console.error('Streaming error:', err);
+        await logAiUsage({
+          actor: payload,
+          feature: 'student.chat',
+          model: 'gemini-2.5-flash-lite',
+          status: 'error',
+          promptChars: message.length + chatHistory.reduce((sum, item) => sum + item.content.length, 0),
+          responseChars: fullContent.length,
+          errorMessage: err instanceof Error ? err.message : 'Erreur IA',
+          metadata: { sessionId: session!.id },
+          request: req,
+        });
         controller.enqueue(
           encoder.encode(
             'data: ' + JSON.stringify({ error: 'Erreur IA' }) + '\n\n'

@@ -9,8 +9,6 @@ import {
   AlertCircle,
   Sparkles,
   ShieldCheck,
-  Mic,
-  MicOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,18 +19,6 @@ import {
   apiValidateEvaluation,
   type EvaluationKind,
 } from "@/lib/api-client";
-
-type BrowserSpeechRecognitionCtor = new () => {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onresult: ((event: any) => void) | null;
-  onerror: ((event: any) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
 
 interface CompetencyChild {
   description: string;
@@ -93,22 +79,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
   });
   const [loadingKindData, setLoadingKindData] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [listeningKey, setListeningKey] = useState<string | null>(null);
-  const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
-  const [debugStep, setDebugStep] = useState<string | null>(null);
-  const [rawDebug, setRawDebug] = useState<string | null>(null);
-  const recognitionRef = useRef<any>(null); // Note: reused for MediaRecorder in some places or kept for legacy cleanup
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const [audioLevel, setAudioLevel] = useState(0);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const recordStartTimeRef = useRef<number>(0);
-  const speechFallbackRecorderRef = useRef<MediaRecorder | null>(null);
-  const speechFallbackStreamRef = useRef<MediaStream | null>(null);
-  const speechFallbackChunksRef = useRef<Blob[]>([]);
-  const speechFallbackStartRef = useRef<number>(0);
-  const speechFallbackUseServerRef = useRef(false);
 
   const isValidated = validationByKind[evaluationKind].isValidated;
   const validatedAt = validationByKind[evaluationKind].validatedAt;
@@ -225,377 +195,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
     triggerAutoSave(competencyCode);
   };
 
-  const appendTranscribedText = useCallback((key: string, cleanText: string) => {
-    if (key === "GLOBAL") {
-      setGlobalComment((prev) => {
-        const current = prev || "";
-        return current + (current ? " " : "") + cleanText;
-      });
-      setGlobalCommentDirty(true);
-      return;
-    }
-
-    setCurrentComments((prev) => {
-      const current = prev[key] || "";
-      const updated = current + (current ? " " : "") + cleanText;
-      return { ...prev, [key]: updated };
-    });
-    const competencyCode = key.replace(/_\d+$/, "");
-    setDirtyCodes((prev: Set<string>) => new Set(prev).add(competencyCode));
-    triggerAutoSave(competencyCode);
-  }, [triggerAutoSave]);
-
-  const transcribeAudioBlob = useCallback(async (key: string, audioBlob: Blob, mimeType: string) => {
-    const extension = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
-    const formData = new FormData();
-    formData.append("audio", audioBlob, `comment.${extension}`);
-
-    const sizeKB = Math.round(audioBlob.size / 1024);
-    setDebugStep(`4. Analyse IA Pro (${sizeKB}KB)...`);
-    setTranscribingKey(key);
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-      const token = localStorage.getItem("ndrc_token");
-      const headers: HeadersInit = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const response = await fetch("/api/ai/transcribe", {
-        method: "POST",
-        headers,
-        body: formData,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Erreur serveur (${response.status})`);
-      }
-
-      const data = await response.json();
-      const cleanText = data.text ? data.text.trim() : "";
-      setRawDebug(cleanText || JSON.stringify(data));
-
-      if (cleanText && !["[VIDE]", "[SILENCE]", "[BRUIT]"].includes(cleanText)) {
-        appendTranscribedText(key, cleanText);
-      } else {
-        const msg = cleanText === "[BRUIT]"
-          ? "L'IA n'entend que du bruit de fond. Parlez plus distinctement."
-          : "Aucune parole claire détectée par l'IA. Parlez plus fort ou vérifiez votre micro.";
-        setSaveError(msg);
-        setTimeout(() => setSaveError((current) => current === msg ? null : current), 8000);
-      }
-    } catch (err: any) {
-      console.error("Transcription error detail:", err);
-      if (err.name === "AbortError" || err.message?.includes("aborted")) {
-        setRawDebug("ERROR: L'IA met trop de temps à répondre (Timeout 60s).");
-        setSaveError("Détail erreur : L'IA met trop de temps à répondre. Veuillez réessayer.");
-      } else {
-        setRawDebug("ERROR: " + err.message);
-        setSaveError("Détail erreur : " + (err.message || "Échec inconnu"));
-      }
-    } finally {
-      setTranscribingKey(null);
-      setDebugStep(null);
-    }
-  }, [appendTranscribedText]);
-
-  const startRecording = useCallback(async (key: string) => {
-    // Si on clique sur le bouton alors qu'on enregistre déjà cet élément, on arrête
-    if (listeningKey === key) {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-        recognitionRef.current = null;
-      }
-      if (speechFallbackRecorderRef.current && speechFallbackRecorderRef.current.state !== "inactive") {
-        speechFallbackRecorderRef.current.stop();
-      }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
-      setListeningKey(null);
-      setDebugStep(null);
-      return;
-    }
-
-    // Arrêter toute session en cours
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-      recognitionRef.current = null;
-    }
-    if (speechFallbackRecorderRef.current && speechFallbackRecorderRef.current.state !== "inactive") {
-      speechFallbackRecorderRef.current.stop();
-    }
-    if (speechFallbackStreamRef.current) {
-      speechFallbackStreamRef.current.getTracks().forEach((track) => track.stop());
-      speechFallbackStreamRef.current = null;
-    }
-    speechFallbackChunksRef.current = [];
-    speechFallbackUseServerRef.current = false;
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-
-    // 1) Priorité à la reconnaissance vocale native Chrome.
-    // Elle évite le cas MediaRecorder où certains postes Mac produisent seulement
-    // un conteneur WebM quasi vide malgré une permission micro accordée.
-    const browserSpeechCtor = ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) as BrowserSpeechRecognitionCtor | undefined;
-    if (browserSpeechCtor) {
-      try {
-        const recognition = new (browserSpeechCtor as BrowserSpeechRecognitionCtor)();
-        recognitionRef.current = recognition;
-        recognition.lang = "fr-FR";
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-
-        let finalText = "";
-        let latestHeardText = "";
-
-        // Enregistre aussi l'audio en parallèle pour fallback serveur si la reco navigateur échoue
-        try {
-          const speechStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
-          const supportedType = types.find((t) => MediaRecorder.isTypeSupported(t));
-          if (supportedType) {
-            const speechRecorder = new MediaRecorder(speechStream, {
-              mimeType: supportedType,
-              audioBitsPerSecond: 128000,
-            });
-            speechFallbackRecorderRef.current = speechRecorder;
-            speechFallbackStreamRef.current = speechStream;
-            speechFallbackChunksRef.current = [];
-            speechFallbackStartRef.current = Date.now();
-
-            speechRecorder.ondataavailable = (e) => {
-              if (e.data.size > 0) speechFallbackChunksRef.current.push(e.data);
-            };
-
-            speechRecorder.onstop = async () => {
-              const mime = speechRecorder.mimeType || "audio/webm";
-              const duration = (Date.now() - speechFallbackStartRef.current) / 1000;
-              const blob = new Blob(speechFallbackChunksRef.current, { type: mime });
-              speechStream.getTracks().forEach((track) => track.stop());
-              speechFallbackStreamRef.current = null;
-              speechFallbackRecorderRef.current = null;
-
-              if (!speechFallbackUseServerRef.current) return;
-              if (duration < 1 || blob.size < 4096) {
-                setRawDebug(`Audio capturé trop petit: ${blob.size} octets`);
-                setSaveError("Le navigateur n'a presque pas capturé d'audio. Vérifiez le micro sélectionné dans Chrome puis réessayez.");
-                setTimeout(() => setSaveError((current) => current?.includes("presque pas capturé") ? null : current), 10000);
-                return;
-              }
-
-              setDebugStep("3. Bascule transcription serveur...");
-              await transcribeAudioBlob(key, blob, mime);
-            };
-
-            speechRecorder.start();
-          } else {
-            speechStream.getTracks().forEach((track) => track.stop());
-          }
-        } catch (err) {
-          console.warn("Speech fallback recorder unavailable", err);
-        }
-
-        recognition.onresult = (event: any) => {
-          let interimText = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const part = (event.results[i][0]?.transcript || "").trim();
-            if (!part) continue;
-            if (event.results[i].isFinal) {
-              finalText += (finalText ? " " : "") + part;
-            } else {
-              interimText += (interimText ? " " : "") + part;
-            }
-          }
-          latestHeardText = (finalText || interimText).trim();
-          setRawDebug(latestHeardText ? `FR: ${latestHeardText.slice(0, 120)}` : null);
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error("SpeechRecognition error:", event);
-          speechFallbackUseServerRef.current = true;
-          if (speechFallbackRecorderRef.current && speechFallbackRecorderRef.current.state !== "inactive") {
-            setDebugStep("3. Bascule transcription serveur...");
-            speechFallbackRecorderRef.current.stop();
-            return;
-          }
-          setSaveError("Échec reconnaissance vocale navigateur. Vérifiez micro et autorisation.");
-          setListeningKey(null);
-          setDebugStep(null);
-        };
-
-        recognition.onend = () => {
-          recognitionRef.current = null;
-          setListeningKey(null);
-          setDebugStep(null);
-          const cleanText = (finalText || latestHeardText).trim();
-          if (cleanText.length >= 2) {
-            speechFallbackUseServerRef.current = false;
-            appendTranscribedText(key, cleanText);
-            if (speechFallbackRecorderRef.current && speechFallbackRecorderRef.current.state !== "inactive") {
-              speechFallbackRecorderRef.current.stop();
-            }
-          } else {
-            speechFallbackUseServerRef.current = true;
-            if (speechFallbackRecorderRef.current && speechFallbackRecorderRef.current.state !== "inactive") {
-              setDebugStep("3. Bascule transcription serveur...");
-              speechFallbackRecorderRef.current.stop();
-            } else {
-              setSaveError("Aucune parole claire détectée. Réessayez en parlant un peu plus près du micro.");
-              setTimeout(() => setSaveError((current) => current?.includes("Aucune parole claire") ? null : current), 6000);
-            }
-          }
-        };
-
-        setSaveError(null);
-        setRawDebug(null);
-        setListeningKey(key);
-        setDebugStep("🔴 Dictée FR...");
-        recognition.start();
-        return;
-      } catch (err) {
-        console.warn("SpeechRecognition unavailable, fallback MediaRecorder", err);
-      }
-    }
-
-    // 2) Fallback legacy : enregistrement puis transcription serveur
-    try {
-      setDebugStep("1. Demande micro...");
-      const stream = await Promise.race([
-        navigator.mediaDevices.getUserMedia({ audio: true }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout micro (3s)")), 3000))
-      ]);
-      
-      setDebugStep("2. Config recorder...");
-      // Tenter de trouver un format supporté par le navigateur
-      const types = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
-      const supportedType = types.find(t => MediaRecorder.isTypeSupported(t));
-      
-      if (!supportedType) throw new Error("Aucun format audio supporté");
-
-      const recorder = new MediaRecorder(stream, {
-        mimeType: supportedType,
-        audioBitsPerSecond: 128000
-      });
-
-      setAudioLevel(0);
-      
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-        setAudioLevel(0);
-        analyserRef.current = null;
-        
-        const mimeType = recorder.mimeType || "audio/webm";
-        const extension = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        const duration = (Date.now() - recordStartTimeRef.current) / 1000;
-        stream.getTracks().forEach(track => track.stop()); // Libérer le micro
-
-        if (duration < 1) { // Moins d'une seconde = erreur de manip
-            setDebugStep("Trop court...");
-            setTimeout(() => setDebugStep(null), 2000);
-            setListeningKey(null);
-            return;
-        }
-        if (audioBlob.size < 4096) {
-            setDebugStep(null);
-            setListeningKey(null);
-            setSaveError("Le navigateur n'a presque pas capturé d'audio. Vérifiez le micro sélectionné dans Chrome puis réessayez.");
-            setRawDebug(`Audio capturé trop petit: ${audioBlob.size} octets`);
-            setTimeout(() => setSaveError((current) => current?.includes("presque pas capturé") ? null : current), 10000);
-            return;
-        }
-
-        setDebugStep("3. Arrêt & Traitement...");
-        setTranscribingKey(key);
-        setListeningKey(null);
-
-        try {
-          const formData = new FormData();
-          formData.append("audio", audioBlob, `comment.${extension}`);
-
-          const sizeKB = Math.round(audioBlob.size / 1024);
-          setDebugStep(`4. Analyse IA Pro (${sizeKB}KB)...`);
-          
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s max
-
-          const token = localStorage.getItem("ndrc_token");
-          const headers: HeadersInit = {};
-          if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
-          }
-
-          const response = await fetch("/api/ai/transcribe", {
-            method: "POST",
-            headers,
-            body: formData,
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error || `Erreur serveur (${response.status})`);
-          }
-
-          const data = await response.json();
-          const cleanText = data.text ? data.text.trim() : "";
-          setRawDebug(cleanText || JSON.stringify(data));
-          if (cleanText && !["[VIDE]", "[SILENCE]", "[BRUIT]"].includes(cleanText)) {
-            appendTranscribedText(key, cleanText);
-          } else {
-            const msg = cleanText === "[BRUIT]"
-              ? "L'IA n'entend que du bruit de fond. Parlez plus distinctement."
-              : "Aucune parole claire détectée par l'IA. Parlez plus fort ou vérifiez votre micro.";
-            setSaveError(msg);
-            setTimeout(() => setSaveError((current) => current === msg ? null : current), 8000);
-          }
-        } catch (err: any) {
-          console.error("Transcription error detail:", err);
-          if (err.name === "AbortError" || err.message?.includes("aborted")) {
-             setRawDebug("ERROR: L'IA met trop de temps à répondre (Timeout 60s).");
-            setSaveError("Détail erreur : L'IA met trop de temps à répondre. Veuillez réessayer.");
-          } else {
-            setRawDebug("ERROR: " + err.message);
-            setSaveError("Détail erreur : " + (err.message || "Échec inconnu"));
-          }
-        } finally {
-          setTranscribingKey(null);
-          setDebugStep(null);
-        }
-      };
-
-      recorder.start(1000);
-      recordStartTimeRef.current = Date.now();
-      setListeningKey(key);
-      setDebugStep("🔴 Enregistre...");
-      setSaveError(null);
-      setRawDebug(null);
-    } catch (err: any) {
-      console.error("Microphone error", err);
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        setSaveError("Accès micro refusé. Veuillez autoriser le micro dans votre navigateur.");
-      } else {
-        setSaveError("Impossible d'accéder au microphone.");
-      }
-      setListeningKey(null);
-    }
-  }, [appendTranscribedText, listeningKey, transcribeAudioBlob]);
-
   const handleSaveGlobalComment = async () => {
     if (!type || isReadOnly) return;
     setIsSavingGlobal(true);
@@ -647,7 +246,7 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
             <div className="flex items-center justify-between">
               <span className="font-black flex items-center gap-2">
                 <AlertCircle size={20} />
-                Erreur de Transcription IA
+                Erreur
               </span>
               <button onClick={() => setSaveError(null)} className="text-red-400 hover:text-red-600 font-black text-xl leading-none">×</button>
             </div>
@@ -817,55 +416,16 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                 })}
                               </div>
                             </div>
-                            {/* Commentaire + vocal par critère */}
+                            {/* Commentaire par critère */}
                             {(() => {
                               const key = `${comp.code}_${idx}`;
-                              const isListening = listeningKey === key;
                               return (
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-purple-500">
                                       💬 Commentaire — {child.description}
                                     </label>
-                                    {!isReadOnly && (
-                                      <button
-                                        type="button"
-                                        onClick={() => startRecording(key)}
-                                        title={isListening ? "Arrêter la dictée" : "Dicter un commentaire"}
-                                        className={cn(
-                                          "flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-black transition-all",
-                                          isListening
-                                            ? "bg-red-100 text-red-600 animate-pulse"
-                                            : "bg-purple-50 text-purple-500 hover:bg-purple-100"
-                                        )}
-                                      >
-                                        {isListening ? (
-                                           <><MicOff size={12} /> {debugStep || "Stop"}</>
-                                         ) : transcribingKey === key ? (
-                                           <><Loader2 size={12} className="animate-spin" /> {debugStep || "Transcription..."}</>
-                                         ) : (
-                                           <><Mic size={12} /> Dicter (IA)</>
-                                         )}
-                                      </button>
-                                    )}
                                   </div>
-
-                                  {rawDebug && (transcribingKey === key || isListening) && (
-                                     <div className="text-[10px] text-blue-500 bg-blue-50 p-2 rounded-xl border border-blue-100 italic animate-pulse">
-                                       Signal IA : {rawDebug}
-                                     </div>
-                                   )}
-
-                                  {isListening && (
-                                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-1 mb-2">
-                                      <motion.div 
-                                        className="h-full bg-red-500"
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${Math.min(100, audioLevel * 2.5)}%` }}
-                                        transition={{ type: "spring", bounce: 0, duration: 0.1 }}
-                                      />
-                                    </div>
-                                  )}
                                   <textarea
                                     value={currentComments[key] || ""}
                                     onChange={(e) => handleCommentChange(key, e.target.value)}
@@ -874,7 +434,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
                                     rows={2}
                                     className={cn(
                                       "w-full text-sm rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 placeholder:text-slate-300 focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-50 resize-none transition-colors",
-                                      isListening && "border-red-300 ring-2 ring-red-50",
                                       isReadOnly && "opacity-60 cursor-not-allowed bg-slate-50"
                                     )}
                                   />
@@ -910,27 +469,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
               Commentaire général — ensemble du référentiel
             </h3>
             <div className="flex items-center gap-3">
-              {!isReadOnly && (
-                <button
-                  type="button"
-                  onClick={() => startRecording("GLOBAL")}
-                  title={listeningKey === "GLOBAL" ? "Arrêter la dictée" : "Dicter un commentaire global"}
-                  className={cn(
-                    "flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black transition-all",
-                    listeningKey === "GLOBAL"
-                      ? "bg-red-100 text-red-600 animate-pulse"
-                      : "bg-purple-50 text-purple-500 hover:bg-purple-100 border border-purple-100"
-                  )}
-                >
-                  {listeningKey === "GLOBAL" ? (
-                    <><MicOff size={14} /> Stop</>
-                  ) : transcribingKey === "GLOBAL" ? (
-                    <><Loader2 size={14} className="animate-spin" /> Transcription...</>
-                  ) : (
-                    <><Mic size={14} /> Dicter (IA)</>
-                  )}
-                </button>
-              )}
               {globalCommentDirty && (
                 <button
                   onClick={handleSaveGlobalComment}
@@ -943,16 +481,6 @@ export function ReferentialGrid({ studentId, referential, title, type, initialGr
               )}
             </div>
           </div>
-          {listeningKey === "GLOBAL" && (
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-4">
-              <motion.div 
-                className="h-full bg-purple-500"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, audioLevel * 2.5)}%` }}
-                transition={{ type: "spring", bounce: 0, duration: 0.1 }}
-              />
-            </div>
-          )}
           <textarea
             value={globalComment}
             onChange={(e) => { setGlobalComment(e.target.value); setGlobalCommentDirty(true); }}
