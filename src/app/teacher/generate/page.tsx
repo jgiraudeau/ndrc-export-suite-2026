@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { 
-  Sparkles, 
-  FileText, 
-  Send, 
-  Download, 
-  RefreshCw, 
-  Wand2, 
-  Target, 
-  MessageSquare, 
+  Sparkles,
+  FileText,
+  Send,
+  Download,
+  RefreshCw,
+  Wand2,
+  Target,
+  MessageSquare,
   X,
   History,
   Clock,
@@ -17,7 +17,9 @@ import {
   GraduationCap,
   FileDown,
   Table as TableIcon,
-  HelpCircle
+  HelpCircle,
+  BookmarkPlus,
+  Check
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
@@ -36,6 +38,8 @@ export default function TeacherGenerate() {
     const [generatedContent, setGeneratedContent] = useState("");
     const [generatedFilename, setGeneratedFilename] = useState("");
     const [refinement, setRefinement] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
 
     const generateDocument = async () => {
         setLoading(true);
@@ -105,6 +109,25 @@ export default function TeacherGenerate() {
             generatedContent,
             track
         );
+    };
+
+    const saveDocument = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch("/api/generate/documents", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: topic, content: generatedContent, documentType: docType }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch {
+            alert("Erreur lors de la sauvegarde.");
+        } finally {
+            setSaving(false);
+        }
     };
 
     const exportQuiz = async (format: "gift" | "wooclap" | "google") => {
@@ -335,8 +358,17 @@ export default function TeacherGenerate() {
                                                 </div>
                                             )}
                                             
-                                            <button 
-                                                onClick={downloadPDF} 
+                                            <button
+                                                onClick={saveDocument}
+                                                disabled={saving || saved}
+                                                className={`flex items-center gap-2 px-5 py-2.5 font-black text-xs rounded-2xl transition-all shadow-sm border ${saved ? "bg-green-50 text-green-700 border-green-200" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-purple-300 hover:text-purple-600"}`}
+                                                title="Sauvegarder dans la bibliothèque"
+                                            >
+                                                {saving ? <RefreshCw className="animate-spin" size={16} /> : saved ? <Check size={16} /> : <BookmarkPlus size={16} />}
+                                                {saved ? "Sauvegardé !" : "Sauvegarder"}
+                                            </button>
+                                            <button
+                                                onClick={downloadPDF}
                                                 className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-700 font-black text-xs border border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-purple-300 hover:text-purple-600 transition-all shadow-sm"
                                                 title="Télécharger en PDF"
                                             >
