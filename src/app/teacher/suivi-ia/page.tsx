@@ -62,7 +62,7 @@ export default function SuiviIAPage() {
               Suivi du <span className="text-purple-600">Tuteur IA</span>
             </h1>
             <p className="text-lg text-slate-400 font-bold max-w-xl">
-              Analysez les interactions de vos étudiants avec l&apos;intelligence artificielle pour identifier les points de blocage.
+              Analysez les interactions de vos étudiants avec le tuteur pour identifier les points de blocage.
             </p>
           </div>
           
@@ -72,7 +72,7 @@ export default function SuiviIAPage() {
             </div>
             <div className="pr-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Statut du Service</p>
-              <p className="text-sm font-black text-slate-800">Opérationnel (Gemini 3)</p>
+              <p className="text-sm font-black text-slate-800">Opérationnel</p>
             </div>
           </div>
         </header>

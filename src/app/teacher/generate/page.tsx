@@ -174,10 +174,6 @@ export default function TeacherGenerate() {
                     </div>
                     <div className="hidden lg:flex items-center gap-4">
                         <div className="flex flex-col items-end">
-                            <div className="flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full border border-green-100 mb-1">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Moteur Gemini 2.0 Flash</span>
-                            </div>
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Exports : PDF, WORD, GIFT, WOOCLAP</span>
                         </div>
                     </div>

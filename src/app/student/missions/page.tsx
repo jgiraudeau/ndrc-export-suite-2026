@@ -94,7 +94,7 @@ export default function MissionsPage() {
             if (!res.ok) throw new Error(data.error || "Erreur serveur");
             setMissionMarkdown({ text: data.mission, ids: selectedIds });
         } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : "Impossible de joindre Gemini pour générer cette mission.";
+            const message = err instanceof Error ? err.message : "Impossible de générer cette mission. Veuillez réessayer.";
             setErrorMsg(message);
         } finally { setGenerating(false); }
     };
