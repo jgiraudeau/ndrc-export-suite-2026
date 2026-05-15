@@ -36,13 +36,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Accès réservé aux formateurs' }, { status: 403 });
   }
 
-  const { title, content, documentType } = await req.json();
+  const { title, content, documentType, theme, classId, sharedWithStudents } = await req.json();
   if (!title || !content || !documentType) {
     return NextResponse.json({ error: 'Données manquantes' }, { status: 400 });
   }
 
   const doc = await prisma.savedDocument.create({
-    data: { title, content, documentType, teacherId: payload.sub },
+    data: {
+      title,
+      content,
+      documentType,
+      teacherId: payload.sub,
+      theme: theme || null,
+      classId: classId || null,
+      sharedWithStudents: documentType !== 'dossier_prof' && Boolean(sharedWithStudents),
+    },
   });
 
   return NextResponse.json({ id: doc.id });

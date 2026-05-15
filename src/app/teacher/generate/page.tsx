@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { 
+import { useState, useEffect } from "react";
+import {
   Sparkles,
   FileText,
   Send,
@@ -19,13 +19,20 @@ import {
   Table as TableIcon,
   HelpCircle,
   BookmarkPlus,
-  Check
+  Check,
+  Users,
+  Share2,
+  Lock
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { TeacherLayout } from "@/components/layout/TeacherLayout";
 import { DOCUMENT_TYPE_LABELS, DocumentType } from "@/lib/ai/prompts";
 import { PDFService } from "@/lib/pdf-service";
 import { DOCXService } from "@/lib/docx-service";
+
+interface TeacherClass { id: string; code: string; name: string; }
+
+const SHARED_TYPES: DocumentType[] = ["dossier_etudiant", "fiche_deroulement", "quiz"];
 
 export default function TeacherGenerate() {
     const [docType, setDocType] = useState<DocumentType>("dossier_prof");
@@ -40,6 +47,19 @@ export default function TeacherGenerate() {
     const [refinement, setRefinement] = useState("");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [classes, setClasses] = useState<TeacherClass[]>([]);
+    const [selectedClassId, setSelectedClassId] = useState<string>("");
+    const [shareWithStudents, setShareWithStudents] = useState(false);
+
+    useEffect(() => {
+        fetch("/api/teacher/classes")
+            .then((r) => r.json())
+            .then((d) => {
+                setClasses(d.classes ?? []);
+                if (d.classes?.length > 0) setSelectedClassId(d.classes[0].id);
+            })
+            .catch(() => {});
+    }, []);
 
     const generateDocument = async () => {
         setLoading(true);
@@ -111,13 +131,22 @@ export default function TeacherGenerate() {
         );
     };
 
+    const isShareable = SHARED_TYPES.includes(docType);
+
     const saveDocument = async () => {
         setSaving(true);
         try {
             const res = await fetch("/api/generate/documents", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title: topic, content: generatedContent, documentType: docType }),
+                body: JSON.stringify({
+                    title: topic,
+                    content: generatedContent,
+                    documentType: docType,
+                    theme: topic,
+                    classId: isShareable && shareWithStudents ? selectedClassId : null,
+                    sharedWithStudents: isShareable && shareWithStudents,
+                }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
@@ -279,6 +308,53 @@ export default function TeacherGenerate() {
                                     {loading ? <RefreshCw className="animate-spin" size={24} /> : <Sparkles size={24} />}
                                     {loading ? "Génération en cours..." : "Générer le support"}
                                 </button>
+
+                                {/* Bloc partage classe */}
+                                <div className={`rounded-2xl border p-4 space-y-3 transition-all ${isShareable ? "border-indigo-100 bg-indigo-50" : "border-slate-100 bg-slate-50 opacity-60"}`}>
+                                    <div className="flex items-center gap-2">
+                                        {isShareable ? <Share2 size={14} className="text-indigo-500" /> : <Lock size={14} className="text-slate-400" />}
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                            {isShareable ? "Partage avec les élèves" : "Dossier Professeur — réservé au formateur"}
+                                        </span>
+                                    </div>
+
+                                    {isShareable && (
+                                        <>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => setShareWithStudents(!shareWithStudents)}
+                                                    className={`relative w-10 h-5 rounded-full transition-colors ${shareWithStudents ? "bg-indigo-500" : "bg-slate-300"}`}
+                                                >
+                                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${shareWithStudents ? "translate-x-5" : "translate-x-0.5"}`} />
+                                                </button>
+                                                <span className="text-xs font-bold text-slate-600">
+                                                    {shareWithStudents ? "Visible par les élèves" : "Non partagé"}
+                                                </span>
+                                            </div>
+
+                                            {shareWithStudents && (
+                                                <div>
+                                                    <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                                                        <Users size={12} /> Classe destinataire
+                                                    </label>
+                                                    {classes.length === 0 ? (
+                                                        <p className="text-xs text-slate-400 italic">Aucune classe créée</p>
+                                                    ) : (
+                                                        <select
+                                                            value={selectedClassId}
+                                                            onChange={(e) => setSelectedClassId(e.target.value)}
+                                                            className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-indigo-400 transition-all"
+                                                        >
+                                                            {classes.map((c) => (
+                                                                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

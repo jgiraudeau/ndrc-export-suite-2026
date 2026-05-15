@@ -23,13 +23,14 @@ model Teacher {
 }
 
 model Class {
-  id        String    @id @default(cuid())
-  code      String
-  name      String
-  teacherId String
-  createdAt DateTime  @default(now())
-  teacher   Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  students  Student[]
+  id             String          @id @default(cuid())
+  code           String
+  name           String
+  teacherId      String
+  createdAt      DateTime        @default(now())
+  teacher        Teacher         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  students       Student[]
+  savedDocuments SavedDocument[]
 
   @@unique([code, teacherId])
 }
@@ -168,14 +169,18 @@ model EvaluationScore {
 }
 
 model SavedDocument {
-  id           String   @id @default(cuid())
-  title        String
-  content      String
-  documentType String
-  teacherId    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(cuid())
+  title              String
+  content            String
+  documentType       String
+  theme              String?
+  classId            String?
+  sharedWithStudents Boolean  @default(false)
+  teacherId          String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  teacher            Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class              Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
 }
 
 model ProfessionalExperience {
